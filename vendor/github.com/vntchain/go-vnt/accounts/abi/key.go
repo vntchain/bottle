@@ -53,7 +53,7 @@ type Root struct {
 type Node struct {
 	FieldName     string           `json:"name"`
 	FieldType     string           `json:"type"`
-	FieldLocation string           `json:"-"`
+	FieldLocation string           `json:"fieldlocation"`
 	StorageType   StorageType      `json:"storagetype"`
 	Children      map[string]*Node `json:"children"`
 	Tables        []*Node          `json:"tables"`

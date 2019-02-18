@@ -55,11 +55,11 @@ enabled_metadata=1
 
 #### ```mac```
 
-[wasmception]https://github.com/ooozws/clang-heroku-slug/blob/master/precomp/wasmception-darwin-bin.tar.gz
+[wasmception] https://github.com/ooozws/clang-heroku-slug/blob/master/precomp/wasmception-darwin-bin.tar.gz
 
 #### ```linux```
 
-[wasmception]https://github.com/ooozws/clang-heroku-slug/blob/master/precomp/wasmception-linux-bin.tar.gz
+[wasmception] https://github.com/ooozws/clang-heroku-slug/blob/master/precomp/wasmception-linux-bin.tar.gz
 
 下载wasmception并解压wasmception,设置wasmception的环境变量
 

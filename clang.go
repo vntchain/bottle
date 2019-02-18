@@ -46,6 +46,7 @@ func cmd(args []string) int {
 			return clang.ChildVisit_Continue
 		}
 		getVarDecl(cursor, parent)
+		getFunc(cursor, parent)
 		switch cursor.Kind() {
 		case clang.Cursor_ClassDecl, clang.Cursor_EnumDecl, clang.Cursor_StructDecl, clang.Cursor_Namespace:
 			return clang.ChildVisit_Recurse
@@ -187,6 +188,7 @@ func getVarDecl(cursor, parent clang.Cursor) {
 	}
 	structnames := strings.Join(allstruct, "|")
 	if decl == clang.Cursor_VarDecl {
+		_, _, _, offset := cursor.Location().FileLocation()
 		// fmt.Printf("\n******          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 		// fmt.Printf("******parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 		// if strings.Contains(cursortype, "struct") || strings.Contains(cursortype, "volatile _S") {
@@ -200,17 +202,16 @@ func getVarDecl(cursor, parent clang.Cursor) {
 			// fmt.Printf("******parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 			if strings.Contains(cursortype, "struct (anonymous") {
 				contents := strings.Split(cursortype, ":")
-				fmt.Printf("contents %+v\n", contents)
 				num, err := strconv.Atoi(contents[len(contents)-2])
 				if err != nil {
 					panic(err)
 				}
-				if !isKey(fileContent[num-1], structnames) {
+				if !isKey(string(fileContent[num-1].Content), structnames) {
 					return
 				}
 			} else {
 				_, x1, _, _ := cursor.Location().FileLocation()
-				if !isKey(fileContent[x1-1], structnames) {
+				if !isKey(string(fileContent[x1-1].Content), structnames) {
 					return
 				}
 			}
@@ -220,7 +221,7 @@ func getVarDecl(cursor, parent clang.Cursor) {
 					varLists.Root[cursorname] = v
 					v.FieldName = cursorname
 					v.FieldType = ""
-					v.FieldLocation = ""
+					v.FieldLocation = fmt.Sprintf("%d", offset)
 
 					//todo 优化 key.go:84
 					var allkey = ""
@@ -260,21 +261,22 @@ func getVarDecl(cursor, parent clang.Cursor) {
 				}
 			}
 		} else {
-			sourceFile, x1, _, _ := cursor.Location().FileLocation()
+			sourceFile, x1, _, offset := cursor.Location().FileLocation()
 			ext := path.Ext(sourceFile.Name())
 			if strings.Compare(ext, ".h") == 0 {
 				return
 			}
-			if !isKey(fileContent[x1-1], structnames) {
+			if !isKey(string(fileContent[x1-1].Content), structnames) {
 				return
 			}
+			offsetStr := fmt.Sprintf("%d", offset)
 			if strings.Contains(cursortype, "volatile") {
 				//volatile int64
-				node := abi.NewNode(cursorname, cursortype[9:], "")
+				node := abi.NewNode(cursorname, cursortype[9:], offsetStr)
 				node.StorageType = abi.NormalTy
 				varLists.Root[cursorname] = node
 			} else {
-				node := abi.NewNode(cursorname, cursortype, "")
+				node := abi.NewNode(cursorname, cursortype, offsetStr)
 				node.StorageType = abi.NormalTy
 				varLists.Root[cursorname] = node
 			}
@@ -286,11 +288,14 @@ func getVarDecl(cursor, parent clang.Cursor) {
 func getFunc(cursor, parent clang.Cursor) {
 
 	if cursor.Kind() == clang.Cursor_FunctionDecl {
-		_, x1, _, _ := cursor.Location().FileLocation()
-		fmt.Println("func =======================")
-		fmt.Printf("cursor %v \n", fileContent[x1-1])
-		fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
-		fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+		// _, x1, x2, x3 := cursor.Location().FileLocation()
+		// fmt.Println("func =======================")
+		// fmt.Printf("cursor %d %d %d \n", x1, x2, x3)
+		// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
+		// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+		funcLists = append(funcLists, funcType{
+			Name:      cursor.Spelling(),
+			Signature: cursor.Type().Spelling(),
+		})
 	}
-
 }

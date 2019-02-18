@@ -15,6 +15,11 @@ import (
 	"time"
 )
 
+type ContentPerLine struct {
+	Content []byte
+	Offset  int
+}
+
 func cutUSR(t string) string {
 	pt := t
 	idx := strings.LastIndex(t, "@FI@")
@@ -24,22 +29,35 @@ func cutUSR(t string) string {
 	return pt
 }
 
-func readfile(filepath string) []string {
+func readfile(filepath string) []ContentPerLine {
+
 	fi, err := os.Open(filepath)
 	if err != nil {
 		panic(err.Error())
 	}
 	defer fi.Close()
-	contents := []string{}
-	br := bufio.NewReader(fi)
+	ficon, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		panic(err.Error())
+	}
+	// contents := []string{}
+	contensPerLine := []ContentPerLine{}
+	br := bufio.NewReaderSize(fi, len(ficon))
+	offset := 0
 	for {
-		a, _, c := br.ReadLine()
+		a, c := br.ReadBytes('\n')
 		if c == io.EOF {
 			break
 		}
-		contents = append(contents, string(a))
+		// contents = append(contents, string(a))
+		contensPerLine = append(contensPerLine, ContentPerLine{
+			Content: a,
+			Offset:  offset,
+		})
+		offset = br.Size() - br.Buffered()
 	}
-	return contents
+	fmt.Printf("contensPerLine %+v\n", contensPerLine)
+	return contensPerLine
 }
 
 //KEY _complex s3;
@@ -67,8 +85,6 @@ func isKey(input string, structnames string) bool {
 	if len(idx) == 0 {
 		return flag
 	}
-	fmt.Printf("index %+v\n", idx)
-	fmt.Printf("%s\n", input[0:79])
 	flag = true
 	return flag
 }
@@ -115,4 +131,13 @@ func writeFile(file string, content []byte) error {
 	}
 	f.Close()
 	return os.Rename(f.Name(), file)
+}
+
+func isSupportedType(tp string) bool {
+	types := []string{"int32", "int64", "uint32", "uint64", "uint256", "string", "address", "bool", "void"}
+	typesmap := map[string]bool{}
+	for _, v := range types {
+		typesmap[v] = true
+	}
+	return typesmap[tp]
 }

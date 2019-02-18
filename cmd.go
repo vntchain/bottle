@@ -302,9 +302,19 @@ func hint(ctx *cli.Context) error {
 		return err
 	}
 	cmd([]string{codePath})
-	jsonres, _ := json.Marshal(varLists)
-	fmt.Printf("vallist %s\n", jsonres)
+	// jsonres, _ := json.Marshal(varLists)
+	// fmt.Printf("vallist %s\n", jsonres)
+
+	// structres, _ := json.Marshal(structLists)
+	// fmt.Printf("structres %s\n", structres)
 	hint := newHint(code)
-	hint.contructorCheck()
+	msg, err := hint.contructorCheck()
+	fmt.Printf("msg %+v,err %s\n", msg, err)
+	msg, err = hint.keyCheck()
+	fmt.Printf("msg %+v,err %s\n", msg, err)
+	msg, err = hint.callCheck()
+	fmt.Printf("msg %+v,err %s\n", msg, err)
+	msg, err = hint.eventCheck()
+	fmt.Printf("msg %+v,err %s\n", msg, err)
 	return nil
 }
