@@ -136,7 +136,6 @@ func compile(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	fileContent = readfile(codePath)
 	cmd([]string{codePath})
 	abigen := newAbiGen(code)
 	abigen.removeComment()
@@ -296,7 +295,7 @@ func decompress(ctx *cli.Context) error {
 func hint(ctx *cli.Context) error {
 	fmt.Printf("hint\n")
 	codePath = ctx.String(contractCodeFlag.Name)
-	fileContent = readfile(codePath)
+	// fileContent = readfile(codePath)
 	code, err := ioutil.ReadFile(codePath)
 	if err != nil {
 		return err
@@ -315,6 +314,10 @@ func hint(ctx *cli.Context) error {
 	msg, err = hint.callCheck()
 	fmt.Printf("msg %+v,err %s\n", msg, err)
 	msg, err = hint.eventCheck()
+	fmt.Printf("msg %+v,err %s\n", msg, err)
+	msg, err = hint.payableCheck()
+	fmt.Printf("msg %+v,err %s\n", msg, err)
+	msg, err = hint.exportCheck()
 	fmt.Printf("msg %+v,err %s\n", msg, err)
 	return nil
 }

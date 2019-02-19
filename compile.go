@@ -115,7 +115,7 @@ type abiGen struct {
 	abi  ABI
 }
 
-var fileContent []ContentPerLine
+var fileContent = map[string][]ContentPerLine{}
 var wasmCeptionFlag string
 
 var (

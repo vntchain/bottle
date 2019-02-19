@@ -56,7 +56,9 @@ func readfile(filepath string) []ContentPerLine {
 		})
 		offset = br.Size() - br.Buffered()
 	}
-	fmt.Printf("contensPerLine %+v\n", contensPerLine)
+	// for i, v := range contensPerLine {
+	// 	fmt.Printf("line %d content %s\n", i, v)
+	// }
 	return contensPerLine
 }
 
@@ -140,4 +142,14 @@ func isSupportedType(tp string) bool {
 		typesmap[v] = true
 	}
 	return typesmap[tp]
+}
+
+func escape(input string) string {
+	if len(input) == 0 {
+		return input
+	}
+	if input[0:1] == "$" {
+		input = `\` + input
+	}
+	return input
 }

@@ -32,6 +32,7 @@ func cmd(args []string) int {
 		if cursor.IsNull() {
 			return clang.ChildVisit_Continue
 		}
+		createFileContent(cursor, parent)
 		createStructList(cursor, parent)
 		switch cursor.Kind() {
 		case clang.Cursor_ClassDecl, clang.Cursor_EnumDecl, clang.Cursor_StructDecl, clang.Cursor_Namespace:
@@ -188,7 +189,7 @@ func getVarDecl(cursor, parent clang.Cursor) {
 	}
 	structnames := strings.Join(allstruct, "|")
 	if decl == clang.Cursor_VarDecl {
-		_, _, _, offset := cursor.Location().FileLocation()
+		file, _, _, offset := cursor.Location().FileLocation()
 		// fmt.Printf("\n******          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 		// fmt.Printf("******parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 		// if strings.Contains(cursortype, "struct") || strings.Contains(cursortype, "volatile _S") {
@@ -206,12 +207,15 @@ func getVarDecl(cursor, parent clang.Cursor) {
 				if err != nil {
 					panic(err)
 				}
-				if !isKey(string(fileContent[num-1].Content), structnames) {
+				if !isKey(string(fileContent[file.Name()][num-1].Content), structnames) {
 					return
 				}
 			} else {
 				_, x1, _, _ := cursor.Location().FileLocation()
-				if !isKey(string(fileContent[x1-1].Content), structnames) {
+				if x1-1 < 0 {
+					return
+				}
+				if !isKey(string(fileContent[file.Name()][x1-1].Content), structnames) {
 					return
 				}
 			}
@@ -266,7 +270,10 @@ func getVarDecl(cursor, parent clang.Cursor) {
 			if strings.Compare(ext, ".h") == 0 {
 				return
 			}
-			if !isKey(string(fileContent[x1-1].Content), structnames) {
+			if x1-1 < 0 {
+				return
+			}
+			if !isKey(string(fileContent[sourceFile.Name()][x1-1].Content), structnames) {
 				return
 			}
 			offsetStr := fmt.Sprintf("%d", offset)
@@ -288,14 +295,48 @@ func getVarDecl(cursor, parent clang.Cursor) {
 func getFunc(cursor, parent clang.Cursor) {
 
 	if cursor.Kind() == clang.Cursor_FunctionDecl {
-		// _, x1, x2, x3 := cursor.Location().FileLocation()
+		file, x1, _, _ := cursor.Location().FileLocation()
 		// fmt.Println("func =======================")
-		// fmt.Printf("cursor %d %d %d \n", x1, x2, x3)
+		// fmt.Printf("cursor %s %d %d %d \n", file.Name(), x1, x2, x3)
 		// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 		// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+		var export ExportType
+		var payable bool
+		if x1-2 >= 0 {
+			cont := removeSymbol(string(fileContent[file.Name()][x1-2].Content))
+			if len(cont) == 0 {
+				export = ExportTypeNone
+			} else {
+				cont = strings.Split(cont[0], "\n")
+				if cont[0] == KWMutable {
+					export = ExportTypeMutable
+				} else if cont[0] == KWUnmutable {
+					export = ExportTypeUnmutable
+				} else {
+					export = ExportTypeNone
+				}
+			}
+		}
+		if cursor.Spelling()[0:1] == "$" {
+			payable = true
+		} else {
+			payable = false
+		}
+		// fmt.Printf("content %s x1 %d\n", fileContent[file.Name()][x1-1].Content, x1)
 		funcLists = append(funcLists, funcType{
 			Name:      cursor.Spelling(),
 			Signature: cursor.Type().Spelling(),
+			Export:    export,
+			Payable:   payable,
+			Offset:    fileContent[file.Name()][x1-1].Offset,
+			Size:      len(fileContent[file.Name()][x1-1].Content),
 		})
+	}
+}
+
+func createFileContent(cursor, parent clang.Cursor) {
+	file, _, _, _ := cursor.Location().FileLocation()
+	if _, ok := fileContent[file.Name()]; !ok {
+		fileContent[file.Name()] = readfile(file.Name())
 	}
 }

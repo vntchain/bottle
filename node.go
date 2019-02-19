@@ -14,9 +14,21 @@ var varLists = abi.Root{
 	Root: make(map[string]*abi.Node),
 }
 
+type ExportType int
+
+const (
+	ExportTypeMutable ExportType = iota
+	ExportTypeUnmutable
+	ExportTypeNone
+)
+
 type funcType struct {
 	Name      string
 	Signature string
+	Export    ExportType
+	Payable   bool
+	Offset    int
+	Size      int
 }
 
 var funcLists = []funcType{}
