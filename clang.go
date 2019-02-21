@@ -23,15 +23,26 @@ func cmd(args []string) int {
 	diagnostics := tu.Diagnostics()
 	for _, d := range diagnostics {
 		// fmt.Printf("d %+v\n", d)
-		fmt.Println("PROBLEM:", d.Spelling())
+		fmt.Println("PROBLEM:", d.Spelling(), " LEVEL:", d.Severity())
+		if d.Severity() == clang.Diagnostic_Error || d.Severity() == clang.Diagnostic_Fatal {
+			// return err
+		}
 	}
 
 	cursor := tu.TranslationUnitCursor()
+
+	// cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
+	// 	fmt.Printf("cursor type %s\n", cursor.Kind().Spelling())
+	// 	fmt.Printf("cursor %p parent %p\n", cursor, parent)
+	// 	return clang.ChildVisit_Recurse
+	// })
 
 	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
 		if cursor.IsNull() {
 			return clang.ChildVisit_Continue
 		}
+		// fmt.Printf("\n******          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
+		// fmt.Printf("******parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 		createFileContent(cursor, parent)
 		createStructList(cursor, parent)
 		switch cursor.Kind() {
@@ -46,13 +57,14 @@ func cmd(args []string) int {
 		if cursor.IsNull() {
 			return clang.ChildVisit_Continue
 		}
-		getVarDecl(cursor, parent)
+		getGlobalVarDecl(cursor, parent)
 		getFunc(cursor, parent)
-		switch cursor.Kind() {
-		case clang.Cursor_ClassDecl, clang.Cursor_EnumDecl, clang.Cursor_StructDecl, clang.Cursor_Namespace:
-			return clang.ChildVisit_Recurse
-		}
-		return clang.ChildVisit_Continue
+		// switch cursor.Kind() {
+		// case clang.Cursor_ClassDecl, clang.Cursor_EnumDecl, clang.Cursor_StructDecl, clang.Cursor_Namespace:
+		// 	return clang.ChildVisit_Recurse
+		// }
+		// return clang.ChildVisit_Continue
+		return clang.ChildVisit_Recurse
 	})
 	// structLists.Fulling()
 	// jsonres, _ := json.Marshal(structLists)
@@ -179,7 +191,7 @@ func createStructList(cursor, parent clang.Cursor) {
 }
 
 //c:main6.cpp@S@main6.cpp@8255
-func getVarDecl(cursor, parent clang.Cursor) {
+func getGlobalVarDecl(cursor, parent clang.Cursor) {
 	decl := cursor.Kind()
 	cursortype := cursor.Type().Spelling()
 	cursorname := cursor.Spelling()
@@ -292,51 +304,79 @@ func getVarDecl(cursor, parent clang.Cursor) {
 	}
 }
 
-func getFunc(cursor, parent clang.Cursor) {
+var currentFunctionHash uint32
 
-	if cursor.Kind() == clang.Cursor_FunctionDecl {
-		file, x1, _, _ := cursor.Location().FileLocation()
-		// fmt.Println("func =======================")
-		// fmt.Printf("cursor %s %d %d %d \n", file.Name(), x1, x2, x3)
+func getFunc(cursor, parent clang.Cursor) {
+	// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
+	// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+	if cursor.Kind() == clang.Cursor_FunctionDecl && parent.Kind() == clang.Cursor_TranslationUnit {
+		currentFunctionHash = cursor.HashCursor()
+		// fmt.Printf("function\n")
 		// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 		// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
-		var export ExportType
-		var payable bool
-		if x1-2 >= 0 {
-			cont := removeSymbol(string(fileContent[file.Name()][x1-2].Content))
-			if len(cont) == 0 {
-				export = ExportTypeNone
-			} else {
-				cont = strings.Split(cont[0], "\n")
-				if cont[0] == KWMutable {
-					export = ExportTypeMutable
-				} else if cont[0] == KWUnmutable {
-					export = ExportTypeUnmutable
-				} else {
-					export = ExportTypeNone
-				}
-			}
+		// fmt.Printf("hash %d\n ", currentFunctionHash)
+		info := getFunctionInfo(cursor, parent)
+		function := NewFunction(cursor.HashCursor(), cursor.Spelling(), info)
+		if functionTree == nil {
+			functionTree = NewFunctionTree()
 		}
-		if cursor.Spelling()[0:1] == "$" {
-			payable = true
-		} else {
-			payable = false
-		}
-		// fmt.Printf("content %s x1 %d\n", fileContent[file.Name()][x1-1].Content, x1)
-		funcLists = append(funcLists, funcType{
-			Name:      cursor.Spelling(),
-			Signature: cursor.Type().Spelling(),
-			Export:    export,
-			Payable:   payable,
-			Offset:    fileContent[file.Name()][x1-1].Offset,
-			Size:      len(fileContent[file.Name()][x1-1].Content),
-		})
+		functionTree.AddFunction(function)
+		// fmt.Printf("function %+v\n parent %d\n", function, parent.HashCursor())
 	}
+	if cursor.Kind() == clang.Cursor_CallExpr {
+		file, x1, _, _ := cursor.Location().FileLocation()
+		// fmt.Printf("call\n")
+		// fmt.Printf("hash %d function %s\n ", currentFunctionHash, cursor.Spelling())
+		offset := fileContent[file.Name()][x1-1].Offset
+		size := len(fileContent[file.Name()][x1-1].Content)
+		functionTree.AddCall(currentFunctionHash, cursor.Spelling(), file.Name(), offset, size)
+		// fmt.Printf("func           %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
+		// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+	}
+
 }
 
 func createFileContent(cursor, parent clang.Cursor) {
 	file, _, _, _ := cursor.Location().FileLocation()
 	if _, ok := fileContent[file.Name()]; !ok {
 		fileContent[file.Name()] = readfile(file.Name())
+	}
+}
+
+func getFunctionInfo(cursor, parent clang.Cursor) FunctionInfo {
+	file, x1, _, _ := cursor.Location().FileLocation()
+	fmt.Println("func =======================")
+	// fmt.Printf("cursor %s %d %d %d \n", file.Name(), x1, x2, x3)
+	// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
+	// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+	var export ExportType
+	var payable bool
+	if x1-2 >= 0 {
+		cont := removeSymbol(string(fileContent[file.Name()][x1-2].Content))
+		if len(cont) == 0 {
+			export = ExportTypeNone
+		} else {
+			cont = strings.Split(cont[0], "\n")
+			if cont[0] == KWMutable {
+				export = ExportTypeMutable
+			} else if cont[0] == KWUnmutable {
+				export = ExportTypeUnmutable
+			} else {
+				export = ExportTypeNone
+			}
+		}
+	}
+	if cursor.Spelling()[0:1] == "$" {
+		payable = true
+	} else {
+		payable = false
+	}
+	// fmt.Printf("content %s x1 %d\n", fileContent[file.Name()][x1-1].Content, x1)
+	return FunctionInfo{
+		Name:      cursor.Spelling(),
+		Signature: cursor.Type().Spelling(),
+		Export:    export,
+		Payable:   payable,
+		Location:  NewLocation(file.Name(), fileContent[file.Name()][x1-1].Offset, len(fileContent[file.Name()][x1-1].Content)),
 	}
 }

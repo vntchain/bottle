@@ -306,7 +306,7 @@ func hint(ctx *cli.Context) error {
 
 	// structres, _ := json.Marshal(structLists)
 	// fmt.Printf("structres %s\n", structres)
-	hint := newHint(code)
+	hint := newHint(codePath, code)
 	msg, err := hint.contructorCheck()
 	fmt.Printf("msg %+v,err %s\n", msg, err)
 	msg, err = hint.keyCheck()
@@ -318,6 +318,8 @@ func hint(ctx *cli.Context) error {
 	msg, err = hint.payableCheck()
 	fmt.Printf("msg %+v,err %s\n", msg, err)
 	msg, err = hint.exportCheck()
+	fmt.Printf("msg %+v,err %s\n", msg, err)
+	msg, err = hint.checkUnmutableFunction()
 	fmt.Printf("msg %+v,err %s\n", msg, err)
 	return nil
 }
