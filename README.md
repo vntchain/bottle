@@ -81,7 +81,7 @@ make all
 NAME:
    bottle - the bottle command line interface
 
-   Copyright 2018-2019 The go-vnt Authors
+   Copyright 2018-2019 The bottle Authors
 
 USAGE:
    bottle [options] command [command options] [arguments...]
@@ -99,21 +99,26 @@ COMMANDS:
 COMPILE OPTIONS:
   --code value  Specific a contract code path
   --include     Specific the head file directory need by contract
+  --output      Specific a output directory path
   
 COMPRESS OPTIONS:
   --wasm value  Specific a wasm path
   --abi value   Specific a abi path need by contract
+  --output      Specific a output directory path
   
 DECOMPRESS OPTIONS:
   --file value  Specific a compress file path to decompress
+  --output      Specific a output directory path
   
-OPTION OPTIONS:
-  --output    Specific a output directory path
+HINT OPTIONS:
+  --code value  Specific a contract code path
+  
+ OPTIONS:
   --help, -h  show help
   
 
 COPYRIGHT:
-   Copyright 2018-2019 The go-vnt Authors
+   Copyright 2018-2019 The bottle Authors
 ```
 
 ## 许可证
