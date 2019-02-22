@@ -1,9 +1,3 @@
-#!/bin/bash
-#
-# Copyright IBM Corp, SecureKey Technologies Inc. All Rights Reserved.
-#
-# SPDX-License-Identifier: Apache-2.0
-#
 
 function filterGeneratedFiles {
   for f in $@; do
@@ -14,61 +8,63 @@ function filterGeneratedFiles {
 function filterExcludedFiles {
   CHECK=`echo "$CHECK" \
 		| grep -v "^\.git/" \
+          | grep -v "^\.gitignore" \
 		| grep -v "^\.build/" \
 		| grep -v "^vendor/" \
+          | grep -v "^Makefile" \
 		| grep -v "testdata/" \
 		| grep -v "^LICENSE$" \
-		| grep -v "\.png$" \
-		| grep -v "\.rst$" \
-		| grep -v "\.txt$" \
-		| grep -v "\.pem$" \
-		| grep -v "\.block$" \
-		| grep -v "\.tx$" \
-		| grep -v "_sk$" \
-		| grep -v "\.key$" \
 		| grep -v "\.gen\.go$" \
 		| grep -v "^Gopkg\.lock$" \
 		| grep -v "\.md$" \
-		| grep -v "\.pb\.go$" \
-		| grep -v "\.pptx$" \
 		| grep -v "ci.properties" \
 		| sort -u`
 
   CHECK=$(filterGeneratedFiles "$CHECK")
 }
 
-CHECK=$(git diff --name-only --diff-filter=ACMRTUXB HEAD)
+CHECK=$(git ls-files)
 filterExcludedFiles
-if [[ -z "$CHECK" ]]; then
-  LAST_COMMITS=($(git log -2 --pretty=format:"%h"))
-  CHECK=$(git diff-tree --no-commit-id --name-only --diff-filter=ACMRTUXB -r ${LAST_COMMITS[1]} ${LAST_COMMITS[0]})
-  filterExcludedFiles
-fi
 
 if [[ -z "$CHECK" ]]; then
    echo "All files are excluded from having license headers"
    exit 0
 fi
 
-missing=`echo "$CHECK" | xargs ls -d 2>/dev/null | xargs grep -L "SPDX-License-Identifier"`
+missing=`echo "$CHECK" | xargs ls -d 2>/dev/null | xargs grep -L -E "Copyright 2019 The bottle Authors|Copyright 2015 The go-ethereum Authors"`
+echo $missing
 if [[ -z "$missing" ]]; then
-   echo "All files have SPDX-License-Identifier headers"
+   echo "All files have GNU Lesser General Public License headers"
    exit 0
 fi
-echo "The following files are missing SPDX-License-Identifier headers:"
+echo "The following files are missing GNU Lesser General Public License headers:"
 echo "$missing"
 echo
-echo "Please replace the Apache license header comment text with:"
-echo "SPDX-License-Identifier: Apache-2.0"
+echo "Please replace the header comment text with:"
+echo "// Copyright 2019 The bottle Authors
+// This file is part of the bottle library.
+//
+// The bottle library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The bottle library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the bottle library. If not, see <http://www.gnu.org/licenses/>."
 
 echo
-echo "Checking committed files for traditional Apache License headers ..."
-missing=`echo "$missing" | xargs ls -d 2>/dev/null | xargs grep -L "http://www.apache.org/licenses/LICENSE-2.0"`
+echo "Checking committed files for GNU Lesser General Public License headers ..."
+missing=`echo "$missing" | xargs ls -d 2>/dev/null | xargs grep -L "http://www.gnu.org/licenses/"`
 if [[ -z "$missing" ]]; then
    echo "All remaining files have Apache 2.0 headers"
    exit 0
 fi
-echo "The following files are missing traditional Apache 2.0 headers:"
+echo "The following files are missing headers:"
 echo "$missing"
 echo "Fatal Error - All files must have a license header"
 exit 1
