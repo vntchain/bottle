@@ -58,6 +58,7 @@ func cmd(args []string) int {
 			return clang.ChildVisit_Continue
 		}
 		getGlobalVarDecl(cursor, parent)
+		getVarInFunction(cursor, parent)
 		getFunc(cursor, parent)
 		// switch cursor.Kind() {
 		// case clang.Cursor_ClassDecl, clang.Cursor_EnumDecl, clang.Cursor_StructDecl, clang.Cursor_Namespace:
@@ -310,6 +311,7 @@ func getFunc(cursor, parent clang.Cursor) {
 	// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 	// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 	if cursor.Kind() == clang.Cursor_FunctionDecl && parent.Kind() == clang.Cursor_TranslationUnit {
+		fmt.Printf("=============Cursor_FunctionDecl==============\n")
 		currentFunctionHash = cursor.HashCursor()
 		// fmt.Printf("function\n")
 		// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
@@ -379,4 +381,9 @@ func getFunctionInfo(cursor, parent clang.Cursor) FunctionInfo {
 		Payable:   payable,
 		Location:  NewLocation(file.Name(), fileContent[file.Name()][x1-1].Offset, len(fileContent[file.Name()][x1-1].Content)),
 	}
+}
+
+func getVarInFunction(cursor, parent clang.Cursor) {
+	fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
+	fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 }

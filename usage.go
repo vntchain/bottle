@@ -66,6 +66,7 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			contractCodeFlag,
 			includeFlag,
+			outputFlag,
 		},
 	},
 	{
@@ -73,19 +74,24 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			wasmFlag,
 			abiFlag,
+			outputFlag,
 		},
 	},
 	{
 		Name: "DECOMPRESS",
 		Flags: []cli.Flag{
 			compressFileFlag,
+			outputFlag,
 		},
 	},
 	{
-		Name: "OPTION",
+		Name: "HINT",
 		Flags: []cli.Flag{
-			outputFlag,
+			contractCodeFlag,
 		},
+	},
+	{
+		Name: "",
 	},
 }
 

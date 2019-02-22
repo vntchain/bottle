@@ -203,7 +203,7 @@ func compile(ctx *cli.Context) error {
 	fmt.Printf("Precompile code path: %s\n", codeOutput)
 	fmt.Printf("Wasm path: %s\n", wasmOutput)
 	fmt.Printf("Compress Data path: %s\n", cpsPath)
-	fmt.Printf("Please use %s when you want to create a constract\n", abires.Constructor.Name+".compress")
+	fmt.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
 	fmt.Printf("time duration 2:", time.Since(start))
 	return nil
 }
@@ -249,7 +249,7 @@ func compress(ctx *cli.Context) error {
 	fmt.Printf("Abi path :%s\n", abiPath)
 	fmt.Printf("Output file\n")
 	fmt.Printf("Compress Data path: %s\n", cpsPath)
-	fmt.Printf("Please use %s when you want to create a constract\n", abires.Constructor.Name+".compress")
+	fmt.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
 	return nil
 }
 
