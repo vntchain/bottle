@@ -318,7 +318,6 @@ func decompress(ctx *cli.Context) error {
 }
 
 func hint(ctx *cli.Context) error {
-	fmt.Printf("hint\n")
 	codePath = ctx.String(contractCodeFlag.Name)
 	// fileContent = readfile(codePath)
 	var code []byte
@@ -349,20 +348,41 @@ func hint(ctx *cli.Context) error {
 	// structres, _ := json.Marshal(structLists)
 	// fmt.Printf("structres %s\n", structres)
 	hint := newHint(codePath, code)
+	var msgs HintMessages
 	msg, err := hint.contructorCheck()
-	fmt.Println(msg.ToString())
-	return cli.NewExitError(msg.ToString(), -1)
+	if err != nil {
+		return err
+	}
+	msgs = append(msgs, msg...)
 	msg, err = hint.keyCheck()
-	fmt.Println(msg.ToString())
+	if err != nil {
+		return err
+	}
+	msgs = append(msgs, msg...)
 	msg, err = hint.callCheck()
-	fmt.Println(msg.ToString())
+	if err != nil {
+		return err
+	}
+	msgs = append(msgs, msg...)
 	msg, err = hint.eventCheck()
-	fmt.Println(msg.ToString())
+	if err != nil {
+		return err
+	}
+	msgs = append(msgs, msg...)
 	msg, err = hint.payableCheck()
-	fmt.Println(msg.ToString())
+	if err != nil {
+		return err
+	}
+	msgs = append(msgs, msg...)
 	msg, err = hint.exportCheck()
-	fmt.Println(msg.ToString())
+	if err != nil {
+		return err
+	}
+	msgs = append(msgs, msg...)
 	msg, err = hint.checkUnmutableFunction()
-	fmt.Println(msg.ToString())
-	return nil
+	if err != nil {
+		return err
+	}
+	msgs = append(msgs, msg...)
+	return cli.NewExitError(msgs.ToString(), -1)
 }

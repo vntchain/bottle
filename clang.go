@@ -96,7 +96,7 @@ func cmd(args []string) int {
 		return clang.ChildVisit_Recurse
 	})
 	structLists.Fulling()
-	// jsonres, _ := json.Marshal(structLists)
+	// jsonres, _ := json.Marshal(functionTree)
 	// fmt.Printf("structLists %s\n", jsonres)
 
 	if len(diagnostics) > 0 {
@@ -354,12 +354,12 @@ func getFunc(cursor, parent clang.Cursor) {
 		// fmt.Printf("function %+v\n parent %d\n", function, parent.HashCursor())
 	}
 	if cursor.Kind() == clang.Cursor_CallExpr {
-		file, x1, _, _ := cursor.Location().FileLocation()
+		file, x1, col, _ := cursor.Location().FileLocation()
 		// fmt.Printf("call\n")
 		// fmt.Printf("hash %d function %s\n ", currentFunctionHash, cursor.Spelling())
-		offset := fileContent[file.Name()][x1-1].Offset
+		// offset := fileContent[file.Name()][x1-1].Offset
 		size := len(fileContent[file.Name()][x1-1].Content)
-		functionTree.AddCall(currentFunctionHash, cursor.Spelling(), file.Name(), int(x1-1), offset, size)
+		functionTree.AddCall(currentFunctionHash, cursor.Spelling(), file.Name(), int(x1), int(col), size)
 		// fmt.Printf("func           %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 		// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 	}
@@ -425,8 +425,8 @@ var varDeclSpell string
 var memberExpr string
 
 func getVarInFunction(cursor, parent clang.Cursor) {
-	fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
-	fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+	// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
+	// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 
 	if parent.HashCursor() == CompoundStmtHash { //开始一条新的语句
 		if varDeclSpell != "" {

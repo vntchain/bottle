@@ -55,12 +55,12 @@ func readfile(fi *os.File) []ContentPerLine {
 		if c == io.EOF {
 			break
 		}
-		offset += len(a)
 		// contents = append(contents, string(a))
 		contensPerLine = append(contensPerLine, ContentPerLine{
 			Content: a,
 			Offset:  offset,
 		})
+		offset += len(a)
 	}
 	// for i, v := range contensPerLine {
 	// 	fmt.Printf("line %d content %s\n", i, v)
@@ -68,13 +68,14 @@ func readfile(fi *os.File) []ContentPerLine {
 	return contensPerLine
 }
 
-func GetLineNumber(offset int, filecontent []ContentPerLine) int {
+func GetLineNumber(offset int, filecontent []ContentPerLine) (int, int) {
 	for i := 1; i < len(filecontent); i++ {
 		if offset >= filecontent[i-1].Offset && offset < filecontent[i].Offset {
-			return i
+			fmt.Printf("OFFSET %d I %d (i-1)offset %d (i)offset %d\n", offset, i, filecontent[i-1].Offset, filecontent[i].Offset)
+			return i, offset - filecontent[i-1].Offset + 1
 		}
 	}
-	return 0
+	return 1, 1
 }
 
 //KEY _complex s3;

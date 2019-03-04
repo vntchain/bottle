@@ -77,7 +77,7 @@ type HintMessages []HintMessage
 func (msgs HintMessages) ToString() string {
 	m := ""
 	for i, v := range msgs {
-		m = m + fmt.Sprintf("%s:%d:%d: warning: %s", v.Location.Path, v.Location.Offset, v.Location.Size, v.Message)
+		m = m + fmt.Sprintf("%s:%d:%d: error: %s", v.Location.Path, v.Location.Line, v.Location.Offset, v.Message)
 		if i < len(msgs)-1 {
 			m = m + "\n"
 		}
@@ -99,32 +99,34 @@ func (h *Hint) contructorCheck() (HintMessages, error) {
 	idx := reg.FindAllStringIndex(string(h.Code), -1)
 
 	if len(idx) == 0 {
-		line := GetLineNumber(0, fileContent[h.Path])
 		offset := 0
 		size := 0
+		line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 		msg := HintMessage{
 			Message:  "必须定义一个Contructor方法",
 			Type:     HintTypeError,
-			Location: NewLocation(h.Path, line, offset, size),
+			Location: NewLocation(h.Path, line, lineOffset, size),
 		}
 		msgs = append(msgs, msg)
 		return msgs, nil
 	}
+	h.ConstructorPos = idx[0][0]
 	if len(idx) > 1 {
 		for i := 0; i < len(idx); i++ {
 			offset := idx[i][0]
 			size := idx[i][1] - idx[i][0]
-			line := GetLineNumber(offset, fileContent[h.Path])
+			line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 			msg := HintMessage{
 				Message:  "重复定义Contructor方法",
 				Type:     HintTypeError,
-				Location: NewLocation(h.Path, line, offset, size),
+				Location: NewLocation(h.Path, line, lineOffset, size),
 			}
 			msgs = append(msgs, msg)
 		}
 
 		return msgs, nil
 	}
+
 	return msgs, nil
 }
 
@@ -138,11 +140,11 @@ func (h *Hint) keyCheck() (HintMessages, error) {
 		}
 		if offset >= h.ConstructorPos {
 			size := len(v.FieldName)
-			line := GetLineNumber(offset, fileContent[h.Path])
+			line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 			msg := HintMessage{
 				Message:  "KEY必须定义在construct之前",
 				Type:     HintTypeWarning,
-				Location: NewLocation(h.Path, line, offset, size),
+				Location: NewLocation(h.Path, line, lineOffset, size),
 			}
 			msgs = append(msgs, msg)
 		}
@@ -166,22 +168,22 @@ func (h *Hint) callCheck() (HintMessages, error) {
 			if len(left) != 1 {
 				offset := stridx[0][0]
 				size := stridx[0][1] - stridx[0][0]
-				line := GetLineNumber(offset, fileContent[h.Path])
+				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "CALL方法的返回值为不支持的类型：" + strings.Join(left, " "),
 					Type:     HintTypeError,
-					Location: NewLocation(h.Path, line, offset, size),
+					Location: NewLocation(h.Path, line, lineOffset, size),
 				}
 				msgs = append(msgs, msg)
 			} else {
 				if !isSupportedType(left[0]) {
 					offset := stridx[0][0]
 					size := stridx[0][1] - stridx[0][0]
-					line := GetLineNumber(offset, fileContent[h.Path])
+					line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 					msg := HintMessage{
 						Message:  "CALL方法的返回值为不支持的类型：" + left[0],
 						Type:     HintTypeError,
-						Location: NewLocation(h.Path, line, offset, size),
+						Location: NewLocation(h.Path, line, lineOffset, size),
 					}
 					msgs = append(msgs, msg)
 				}
@@ -189,11 +191,11 @@ func (h *Hint) callCheck() (HintMessages, error) {
 			if len(right) == 0 {
 				offset := stridx[0][0]
 				size := stridx[0][1] - stridx[0][0]
-				line := GetLineNumber(offset, fileContent[h.Path])
+				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "CALL方法至少需要一个类型为CallParams的参数",
 					Type:     HintTypeError,
-					Location: NewLocation(h.Path, line, offset, size),
+					Location: NewLocation(h.Path, line, lineOffset, size),
 				}
 				msgs = append(msgs, msg)
 			} else {
@@ -202,11 +204,11 @@ func (h *Hint) callCheck() (HintMessages, error) {
 						if right[i] != "CallParams" {
 							offset := stridx[0][0]
 							size := stridx[0][1] - stridx[0][0]
-							line := GetLineNumber(offset, fileContent[h.Path])
+							line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 							msg := HintMessage{
 								Message:  "CALL方法的第一个参数为不支持的类型：" + right[i] + ", 支持的类型为CallParams",
 								Type:     HintTypeError,
-								Location: NewLocation(h.Path, line, offset, size),
+								Location: NewLocation(h.Path, line, lineOffset, size),
 							}
 							msgs = append(msgs, msg)
 						}
@@ -214,11 +216,11 @@ func (h *Hint) callCheck() (HintMessages, error) {
 						if !isSupportedType(right[i]) {
 							offset := stridx[0][0]
 							size := stridx[0][1] - stridx[0][0]
-							line := GetLineNumber(offset, fileContent[h.Path])
+							line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 							msg := HintMessage{
 								Message:  "CALL方法的参数为不支持的类型：" + right[i],
 								Type:     HintTypeError,
-								Location: NewLocation(h.Path, line, offset, size),
+								Location: NewLocation(h.Path, line, lineOffset, size),
 							}
 							msgs = append(msgs, msg)
 						}
@@ -244,11 +246,11 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 			if len(right) == 0 {
 				offset := stridx[0][0]
 				size := stridx[0][1] - stridx[0][0]
-				line := GetLineNumber(offset, fileContent[h.Path])
+				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "EVENT方法至少需要一个参数",
 					Type:     HintTypeError,
-					Location: NewLocation(h.Path, line, offset, size),
+					Location: NewLocation(h.Path, line, lineOffset, size),
 				}
 				msgs = append(msgs, msg)
 			} else {
@@ -259,11 +261,11 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 					if !isSupportedType(right[i]) {
 						offset := stridx[0][0]
 						size := stridx[0][1] - stridx[0][0]
-						line := GetLineNumber(offset, fileContent[h.Path])
+						line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 						msg := HintMessage{
 							Message:  "EVENT方法的参数为不支持的类型：" + right[i],
 							Type:     HintTypeError,
-							Location: NewLocation(h.Path, line, offset, size),
+							Location: NewLocation(h.Path, line, lineOffset, size),
 						}
 						msgs = append(msgs, msg)
 						continue
@@ -284,11 +286,11 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 						if irregular {
 							offset := stridx[0][0]
 							size := stridx[0][1] - stridx[0][0]
-							line := GetLineNumber(offset, fileContent[h.Path])
+							line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 							msg := HintMessage{
 								Message:  "EVENT方法中的indexed写法不规范",
 								Type:     HintTypeError,
-								Location: NewLocation(h.Path, line, offset, size),
+								Location: NewLocation(h.Path, line, lineOffset, size),
 							}
 							msgs = append(msgs, msg)
 						}
@@ -341,22 +343,22 @@ func (h *Hint) exportCheck() (HintMessages, error) {
 			if len(left) != 1 {
 				offset := stridx[0][0]
 				size := stridx[0][1] - stridx[0][0]
-				line := GetLineNumber(offset, fileContent[h.Path])
+				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "方法的返回值为不支持的类型：" + strings.Join(left, " "),
 					Type:     HintTypeError,
-					Location: NewLocation(h.Path, line, offset, size),
+					Location: NewLocation(h.Path, line, lineOffset, size),
 				}
 				msgs = append(msgs, msg)
 			} else {
 				if !isSupportedType(left[0]) {
 					offset := stridx[0][0]
 					size := stridx[0][1] - stridx[0][0]
-					line := GetLineNumber(offset, fileContent[h.Path])
+					line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 					msg := HintMessage{
 						Message:  "方法的返回值为不支持的类型：" + left[0],
 						Type:     HintTypeError,
-						Location: NewLocation(h.Path, line, offset, size),
+						Location: NewLocation(h.Path, line, lineOffset, size),
 					}
 					msgs = append(msgs, msg)
 				}
@@ -365,11 +367,11 @@ func (h *Hint) exportCheck() (HintMessages, error) {
 				if !isSupportedType(right[i]) {
 					offset := stridx[0][0]
 					size := stridx[0][1] - stridx[0][0]
-					line := GetLineNumber(offset, fileContent[h.Path])
+					line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 					msg := HintMessage{
 						Message:  "方法的参数为不支持的类型：" + right[i],
 						Type:     HintTypeError,
-						Location: NewLocation(h.Path, line, offset, size),
+						Location: NewLocation(h.Path, line, lineOffset, size),
 					}
 					msgs = append(msgs, msg)
 				}
