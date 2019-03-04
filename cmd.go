@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -212,6 +213,13 @@ func compile(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	hexPath := path.Join(outputDir, abires.Constructor.Name+".hex")
+	hexString := hex.EncodeToString(cpsRes)
+	err = writeFile(hexPath, []byte(hexString))
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("Input file\n")
 	fmt.Printf("Contract path :%s\n", codePath)
 	fmt.Printf("Output file\n")
@@ -219,6 +227,7 @@ func compile(ctx *cli.Context) error {
 	fmt.Printf("Precompile code path: %s\n", codeOutput)
 	fmt.Printf("Wasm path: %s\n", wasmOutput)
 	fmt.Printf("Compress Data path: %s\n", cpsPath)
+	fmt.Printf("Compress Hex Data path: %s\n", hexPath)
 	fmt.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
 	fmt.Printf("time duration 2:", time.Since(start))
 	return nil
@@ -342,6 +351,7 @@ func hint(ctx *cli.Context) error {
 	hint := newHint(codePath, code)
 	msg, err := hint.contructorCheck()
 	fmt.Println(msg.ToString())
+	return cli.NewExitError(msg.ToString(), -1)
 	msg, err = hint.keyCheck()
 	fmt.Println(msg.ToString())
 	msg, err = hint.callCheck()
@@ -354,6 +364,5 @@ func hint(ctx *cli.Context) error {
 	fmt.Println(msg.ToString())
 	msg, err = hint.checkUnmutableFunction()
 	fmt.Println(msg.ToString())
-	os.Exit(-1)
 	return nil
 }

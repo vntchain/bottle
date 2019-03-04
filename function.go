@@ -88,15 +88,15 @@ func (t *FunctionTree) AddFunction(f *Function) {
 	t.Root[f.Hash] = f
 }
 
-func (t *FunctionTree) AddCall(hash uint32, name string, path string, offset int, size int) {
-	t.Root[hash].AddCall(name, hash, path, offset, size)
+func (t *FunctionTree) AddCall(hash uint32, name string, path string, line int, offset int, size int) {
+	t.Root[hash].AddCall(name, hash, path, line, offset, size)
 }
 
-func (f *Function) AddCall(name string, root uint32, path string, offset int, size int) {
+func (f *Function) AddCall(name string, root uint32, path string, line int, offset int, size int) {
 	f.Call = append(f.Call, CallFunction{
 		Name:     name,
 		RootHash: root,
-		Location: NewLocation(path, offset, size),
+		Location: NewLocation(path, line, offset, size),
 	})
 }
 

@@ -68,6 +68,15 @@ func readfile(fi *os.File) []ContentPerLine {
 	return contensPerLine
 }
 
+func GetLineNumber(offset int, filecontent []ContentPerLine) int {
+	for i := 1; i < len(filecontent); i++ {
+		if offset >= filecontent[i-1].Offset && offset < filecontent[i].Offset {
+			return i
+		}
+	}
+	return 0
+}
+
 //KEY _complex s3;
 var astKeyReg = `([ ]*)(KEY)([ ]+)(int(|32|64)|uint(|32|64|256)|address|string|bool|mapping|array|struct)([\s\S]*)`
 var astKeyRegFmt = `([ ]*)(KEY)([ ]+)(int(|32|64)|uint(|32|64|256)|address|string|bool|mapping|array|struct|%s)([\s\S]*)`

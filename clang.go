@@ -359,7 +359,7 @@ func getFunc(cursor, parent clang.Cursor) {
 		// fmt.Printf("hash %d function %s\n ", currentFunctionHash, cursor.Spelling())
 		offset := fileContent[file.Name()][x1-1].Offset
 		size := len(fileContent[file.Name()][x1-1].Content)
-		functionTree.AddCall(currentFunctionHash, cursor.Spelling(), file.Name(), offset, size)
+		functionTree.AddCall(currentFunctionHash, cursor.Spelling(), file.Name(), int(x1-1), offset, size)
 		// fmt.Printf("func           %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 		// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 	}
@@ -416,7 +416,7 @@ func getFunctionInfo(cursor, parent clang.Cursor) FunctionInfo {
 		Signature: cursor.Type().Spelling(),
 		Export:    export,
 		Payable:   payable,
-		Location:  NewLocation(file.Name(), fileContent[file.Name()][x1-1].Offset, len(fileContent[file.Name()][x1-1].Content)),
+		Location:  NewLocation(file.Name(), int(x1-1), fileContent[file.Name()][x1-1].Offset, len(fileContent[file.Name()][x1-1].Content)),
 	}
 }
 

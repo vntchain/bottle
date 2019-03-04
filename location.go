@@ -18,13 +18,15 @@ package main
 
 type Location struct {
 	Path   string
+	Line   int
 	Offset int
 	Size   int
 }
 
-func NewLocation(path string, offset int, size int) Location {
+func NewLocation(path string, line int, offset int, size int) Location {
 	return Location{
 		Path:   path,
+		Line:   line,
 		Offset: offset,
 		Size:   size,
 	}
