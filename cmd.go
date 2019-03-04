@@ -37,7 +37,7 @@ var (
 	// flags that configure the node
 	contractCodeFlag = cli.StringFlag{
 		Name:  "code",
-		Usage: "Specific a contract code path",
+		Usage: "Specific a contract code path, - for STDIN",
 	}
 	outputFlag = cmdutils.DirectoryFlag{
 		Name:  "output",
@@ -312,10 +312,27 @@ func hint(ctx *cli.Context) error {
 	fmt.Printf("hint\n")
 	codePath = ctx.String(contractCodeFlag.Name)
 	// fileContent = readfile(codePath)
-	code, err := ioutil.ReadFile(codePath)
-	if err != nil {
-		return err
+	var code []byte
+	var err error
+	if codePath != "-" {
+		code, err = ioutil.ReadFile(codePath)
+		if err != nil {
+			return err
+		}
+
+	} else {
+		stdin := os.Stdin
+		code, err = ioutil.ReadAll(stdin)
+		if err != nil {
+			return err
+		}
+		codePath = "<stdin>"
+		_, err = stdin.Write(code)
+		if err != nil {
+			return err
+		}
 	}
+
 	cmd([]string{codePath})
 	// jsonres, _ := json.Marshal(varLists)
 	// fmt.Printf("vallist %s\n", jsonres)
@@ -324,18 +341,19 @@ func hint(ctx *cli.Context) error {
 	// fmt.Printf("structres %s\n", structres)
 	hint := newHint(codePath, code)
 	msg, err := hint.contructorCheck()
-	fmt.Printf("msg %+v,err %s\n", msg, err)
+	fmt.Println(msg.ToString())
 	msg, err = hint.keyCheck()
-	fmt.Printf("msg %+v,err %s\n", msg, err)
+	fmt.Println(msg.ToString())
 	msg, err = hint.callCheck()
-	fmt.Printf("msg %+v,err %s\n", msg, err)
+	fmt.Println(msg.ToString())
 	msg, err = hint.eventCheck()
-	fmt.Printf("msg %+v,err %s\n", msg, err)
+	fmt.Println(msg.ToString())
 	msg, err = hint.payableCheck()
-	fmt.Printf("msg %+v,err %s\n", msg, err)
+	fmt.Println(msg.ToString())
 	msg, err = hint.exportCheck()
-	fmt.Printf("msg %+v,err %s\n", msg, err)
+	fmt.Println(msg.ToString())
 	msg, err = hint.checkUnmutableFunction()
-	fmt.Printf("msg %+v,err %s\n", msg, err)
+	fmt.Println(msg.ToString())
+	os.Exit(-1)
 	return nil
 }

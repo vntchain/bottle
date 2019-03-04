@@ -24,18 +24,35 @@ const (
 	ExportTypeNone
 )
 
+type DeclRefType int
+
+const (
+	DeclRefTypeFunction ExportType = iota
+	DeclRefTypeVar
+)
+
 type FunctionInfo struct {
 	Name      string
 	Signature string
 	Export    ExportType
 	Payable   bool
 	Location  Location
+	WriteKey  bool
+	ReturnKey bool
+}
+
+type FunctionVar struct {
+	Name    string
+	Type    DeclRefType
+	Returns []string
+	Chilren map[string]*FunctionVar
 }
 
 type Function struct {
 	Hash uint32
 	Name string
 	Call []CallFunction
+	Vars map[string]*FunctionVar
 	Info FunctionInfo
 }
 
@@ -56,6 +73,7 @@ func NewFunction(hash uint32, name string, info FunctionInfo) *Function {
 		Hash: hash,
 		Name: name,
 		Call: []CallFunction{},
+		Vars: map[string]*FunctionVar{},
 		Info: info,
 	}
 }
@@ -81,3 +99,20 @@ func (f *Function) AddCall(name string, root uint32, path string, offset int, si
 		Location: NewLocation(path, offset, size),
 	})
 }
+
+// func (f *Function) AddVar(name string, ref string, writed bool) {
+// 	isKey := false
+// 	for _, v := range f.Vars {
+// 		if v.Name == ref {
+// 			isKey = true
+// 		}
+// 	}
+// 	f.Vars = append(f.Vars, FunctionVar{
+// 		Name:  name,
+// 		IsKey: isKey,
+// 	})
+// }
+
+// func (t *FunctionTree) ChangeWriteKeyState(hash uint32, state bool) {
+// 	t.Root[hash].Info.WriteKey = state
+// }

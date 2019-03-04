@@ -36,6 +36,22 @@ import (
 //导出方法的类型和参数检查 <complete>
 //uint256及address类型
 
+//方法中KEY写操作的判断：
+//1)直接通过key变量进行写，
+//2)临时变量通过指针指向key变量，并进行了写操作
+//3)方法中调用了其他方法，其他方法中包含上面两种情况，所以必须对每个方法添加一个是否包含写操作的字段
+//4)方法中调用了其他方法，其他方法返回了KEY的变量
+//4.1)返回KEY变量的成员，若成员为array类型的index和mapping类型的key，则该方法为非写操作，
+//4.2)返回KEY变量的成员，若成员为非array类型的index和mapping类型的key，需要从上层方法判断是否进行了写操作
+//4.3)返回KEY变量，非成员，需要从上层方法判断是否对成员进行写操作
+
+//1)临时变量指向一个方法的返回值
+//2)临时变量指向另一个变量
+//2.1)临时变量指向另一个临时变量，递归获取直到最终变量是否是KEY变量，
+//2.1.1)若最终变量为KEY变量，染色为KEY变量，否则，为临时变量
+//2.2)临时变量指向KEY变量，则把该临时变量染色为KEY变量
+//2.3）临时变量指向一个方法的返回值
+
 type Hint struct {
 	Path           string
 	Code           []byte
@@ -55,6 +71,19 @@ type HintMessage struct {
 	Type     HintType
 	Location Location
 }
+type HintMessages []HintMessage
+
+///Users/weisaizhang/Documents/go/src/github.com/ethereum/contract/src/analyse/main.c:12:6: warning: type specifier missing, defaults to 'int' [-Wimplicit-int]
+func (msgs HintMessages) ToString() string {
+	m := ""
+	for i, v := range msgs {
+		m = m + fmt.Sprintf("%s:%d:%d: warning: %s", v.Location.Path, v.Location.Offset, v.Location.Size, v.Message)
+		if i < len(msgs)-1 {
+			m = m + "\n"
+		}
+	}
+	return m
+}
 
 func newHint(path string, code []byte) *Hint {
 
@@ -64,8 +93,8 @@ func newHint(path string, code []byte) *Hint {
 	}
 }
 
-func (h *Hint) contructorCheck() ([]HintMessage, error) {
-	var msgs []HintMessage
+func (h *Hint) contructorCheck() (HintMessages, error) {
+	var msgs HintMessages
 	reg := regexp.MustCompile(constructorReg)
 	idx := reg.FindAllStringIndex(string(h.Code), -1)
 
@@ -93,8 +122,8 @@ func (h *Hint) contructorCheck() ([]HintMessage, error) {
 	return msgs, nil
 }
 
-func (h *Hint) keyCheck() ([]HintMessage, error) {
-	var msgs []HintMessage
+func (h *Hint) keyCheck() (HintMessages, error) {
+	var msgs HintMessages
 	for _, v := range varLists.Root {
 		loc := v.FieldLocation
 		offset, err := strconv.Atoi(loc)
@@ -116,8 +145,8 @@ func (h *Hint) keyCheck() ([]HintMessage, error) {
 	return msgs, nil
 }
 
-func (h *Hint) callCheck() ([]HintMessage, error) {
-	var msgs []HintMessage
+func (h *Hint) callCheck() (HintMessages, error) {
+	var msgs HintMessages
 	callReg := `(CALL)[^(;|\r|\n|\{|\})]*(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		call := fmt.Sprintf(callReg, escape(v.Name))
@@ -179,8 +208,8 @@ func (h *Hint) callCheck() ([]HintMessage, error) {
 	return msgs, nil
 }
 
-func (h *Hint) eventCheck() ([]HintMessage, error) {
-	var msgs []HintMessage
+func (h *Hint) eventCheck() (HintMessages, error) {
+	var msgs HintMessages
 	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		event := fmt.Sprintf(eventReg, escape(v.Name))
@@ -241,8 +270,8 @@ func (h *Hint) eventCheck() ([]HintMessage, error) {
 	return msgs, nil
 }
 
-func (h *Hint) payableCheck() ([]HintMessage, error) {
-	var msgs []HintMessage
+func (h *Hint) payableCheck() (HintMessages, error) {
+	var msgs HintMessages
 	//payable和unmutable不能共存
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeNone {
@@ -263,8 +292,8 @@ func (h *Hint) payableCheck() ([]HintMessage, error) {
 	return msgs, nil
 }
 
-func (h *Hint) exportCheck() ([]HintMessage, error) {
-	var msgs []HintMessage
+func (h *Hint) exportCheck() (HintMessages, error) {
+	var msgs HintMessages
 	exportReg := `[^(;|\r|\n|\{|\})]*(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeNone {
@@ -309,8 +338,8 @@ func (h *Hint) exportCheck() ([]HintMessage, error) {
 	return msgs, nil
 }
 
-func (h *Hint) checkUnmutableFunction() ([]HintMessage, error) {
-	var msgs []HintMessage
+func (h *Hint) checkUnmutableFunction() (HintMessages, error) {
+	var msgs HintMessages
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeUnmutable {
 			for _, call := range v.Call {

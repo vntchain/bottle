@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -31,15 +32,26 @@ var KeyPos [][]int
 var index = 0
 
 func cmd(args []string) int {
-	idx := clang.NewIndex(0, 1)
+	// idx := clang.NewIndex(0, 0)
+	idx := clang.NewIndex(0, 1) //显示diagnostics
 	defer idx.Dispose()
-	tu := idx.ParseTranslationUnit(args[0], []string{"-I", includeDir}, nil, 0)
+	var tu clang.TranslationUnit
+	// tu = idx.ParseTranslationUnit("", []string{"-I", includeDir, "-x", "c", "-"}, nil, 0)
+	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir}, nil, 0)
+	if args[0] == "<stdin>" { //stdin
+		fmt.Printf("<stdin> \n")
+		tu = idx.ParseTranslationUnit("", []string{"-I", includeDir, "-x", "c", "-"}, nil, 0)
+	} else {
+		tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir}, nil, 0)
+	}
+
 	defer tu.Dispose()
 
 	diagnostics := tu.Diagnostics()
 	for _, d := range diagnostics {
 		// fmt.Printf("d %+v\n", d)
-		fmt.Println("PROBLEM:", d.Spelling(), " LEVEL:", d.Severity())
+		// fmt.Println(d.Spelling(), d.CategoryText())
+		// fmt.Println("PROBLEM:", d.Spelling(), " LEVEL:", d.Severity())
 		if d.Severity() == clang.Diagnostic_Error || d.Severity() == clang.Diagnostic_Fatal {
 			// return err
 		}
@@ -74,8 +86,8 @@ func cmd(args []string) int {
 			return clang.ChildVisit_Continue
 		}
 		getGlobalVarDecl(cursor, parent)
-		getVarInFunction(cursor, parent)
 		getFunc(cursor, parent)
+		// getVarInFunction(cursor, parent)
 		// switch cursor.Kind() {
 		// case clang.Cursor_ClassDecl, clang.Cursor_EnumDecl, clang.Cursor_StructDecl, clang.Cursor_Namespace:
 		// 	return clang.ChildVisit_Recurse
@@ -83,12 +95,12 @@ func cmd(args []string) int {
 		// return clang.ChildVisit_Continue
 		return clang.ChildVisit_Recurse
 	})
-	// structLists.Fulling()
+	structLists.Fulling()
 	// jsonres, _ := json.Marshal(structLists)
 	// fmt.Printf("structLists %s\n", jsonres)
 
 	if len(diagnostics) > 0 {
-		fmt.Println("NOTE: There were problems while analyzing the given file")
+		// fmt.Println("NOTE: There were problems while analyzing the given file")
 	}
 
 	return 0
@@ -327,7 +339,7 @@ func getFunc(cursor, parent clang.Cursor) {
 	// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 	// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
 	if cursor.Kind() == clang.Cursor_FunctionDecl && parent.Kind() == clang.Cursor_TranslationUnit {
-		fmt.Printf("=============Cursor_FunctionDecl==============\n")
+		// fmt.Printf("=============Cursor_FunctionDecl==============\n")
 		currentFunctionHash = cursor.HashCursor()
 		// fmt.Printf("function\n")
 		// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
@@ -357,13 +369,22 @@ func getFunc(cursor, parent clang.Cursor) {
 func createFileContent(cursor, parent clang.Cursor) {
 	file, _, _, _ := cursor.Location().FileLocation()
 	if _, ok := fileContent[file.Name()]; !ok {
-		fileContent[file.Name()] = readfile(file.Name())
+		if file.Name() == "<stdin>" {
+			fileContent[file.Name()] = readfile(os.Stdin)
+		} else {
+			fi, err := os.Open(file.Name())
+			if err != nil {
+				panic(err.Error())
+			}
+			fileContent[file.Name()] = readfile(fi)
+			fi.Close()
+		}
 	}
 }
 
 func getFunctionInfo(cursor, parent clang.Cursor) FunctionInfo {
 	file, x1, _, _ := cursor.Location().FileLocation()
-	fmt.Println("func =======================")
+	// fmt.Println("func =======================")
 	// fmt.Printf("cursor %s %d %d %d \n", file.Name(), x1, x2, x3)
 	// fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 	// fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
@@ -399,7 +420,39 @@ func getFunctionInfo(cursor, parent clang.Cursor) FunctionInfo {
 	}
 }
 
+var CompoundStmtHash uint32
+var varDeclSpell string
+var memberExpr string
+
 func getVarInFunction(cursor, parent clang.Cursor) {
 	fmt.Printf("func          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 	fmt.Printf("func parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())
+
+	if parent.HashCursor() == CompoundStmtHash { //开始一条新的语句
+		if varDeclSpell != "" {
+			//
+
+			//初始化
+			varDeclSpell = ""
+			memberExpr = ""
+
+		}
+	}
+
+	switch cursor.Kind() {
+	case clang.Cursor_CompoundStmt:
+		CompoundStmtHash = cursor.HashCursor()
+	case clang.Cursor_VarDecl:
+		varDeclSpell = cursor.Spelling()
+		fmt.Printf("VarDecl Spell %s\n", varDeclSpell)
+	case clang.Cursor_ReturnStmt: //返回值是否是key
+	}
+	// if cursor.Kind() == clang.Cursor_CompoundStmt {
+	// 	CompoundStmtHash = cursor.HashCursor()
+	// }
+	// if cursor.Kind() == clang.Cursor_VarDecl {
+	// 	varDeclSpell = cursor.Spelling()
+	// 	fmt.Printf("VarDecl Spell %s\n", varDeclSpell)
+	// }
+
 }

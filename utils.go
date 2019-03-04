@@ -45,32 +45,22 @@ func cutUSR(t string) string {
 	return pt
 }
 
-func readfile(filepath string) []ContentPerLine {
-
-	fi, err := os.Open(filepath)
-	if err != nil {
-		panic(err.Error())
-	}
-	defer fi.Close()
-	ficon, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		panic(err.Error())
-	}
+func readfile(fi *os.File) []ContentPerLine {
 	// contents := []string{}
 	contensPerLine := []ContentPerLine{}
-	br := bufio.NewReaderSize(fi, len(ficon))
+	br := bufio.NewReader(fi)
 	offset := 0
 	for {
 		a, c := br.ReadBytes('\n')
 		if c == io.EOF {
 			break
 		}
+		offset += len(a)
 		// contents = append(contents, string(a))
 		contensPerLine = append(contensPerLine, ContentPerLine{
 			Content: a,
 			Offset:  offset,
 		})
-		offset = br.Size() - br.Buffered()
 	}
 	// for i, v := range contensPerLine {
 	// 	fmt.Printf("line %d content %s\n", i, v)
@@ -85,7 +75,7 @@ var astKeyRegFmt = `([ ]*)(KEY)([ ]+)(int(|32|64)|uint(|32|64|256)|address|strin
 const keyTypeReg = `(int(|32|64)|uint(|32|64|256)|address|string|bool|mapping|array|struct)`
 
 func isKey(input string, structnames string) bool {
-	fmt.Printf("structnames %s\n", structnames)
+	// fmt.Printf("structnames %s\n", structnames)
 	keyReg := ""
 	if structnames == "" {
 		keyReg = astKeyReg
