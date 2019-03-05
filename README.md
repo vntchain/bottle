@@ -84,7 +84,7 @@ NAME:
    Copyright 2018-2019 The bottle Authors
 
 USAGE:
-   bottle [options] command [command options] [arguments...]
+   bottle [global options] command [command options] [arguments...]
    
 VERSION:
    0.6.0-beta
@@ -97,7 +97,7 @@ COMMANDS:
    help, h     Shows a list of commands or help for one command
    
 COMPILE OPTIONS:
-  --code value  Specific a contract code path
+  --code value  Specific a contract code path, - for STDIN
   --include     Specific the head file directory need by contract
   --output      Specific a output directory path
   
@@ -111,9 +111,9 @@ DECOMPRESS OPTIONS:
   --output      Specific a output directory path
   
 HINT OPTIONS:
-  --code value  Specific a contract code path
+  --code value  Specific a contract code path, - for STDIN
   
- OPTIONS:
+GLOBAL OPTIONS:
   --help, -h  show help
   
 
