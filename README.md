@@ -3,7 +3,7 @@
 ``Bottle``是开发``VNT``智能合约的命令行工具。
 ``Bottle``支持将c语言智能合约编译成``wasm``，提取``abi``文件，并将``wasm``和``abi``压缩及编码成``VNT``网络合约部署所需要的智能合约文件。
 
-### 编译得到bottle命令
+## 编译得到bottle命令
 
 ```
 git clone git@github.com:vntchain/bottle.git
