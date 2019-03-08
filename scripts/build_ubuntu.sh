@@ -1,6 +1,5 @@
      
-     #WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
-     WASMCEPTION_URL="http://192.168.9.251:9000/temp/wasmception-linux-bin.tar.gz"
+     WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
      OS_VERSION=$( cat /etc/os-release | grep ^VERSION_ID | cut -d'=' -f2 | sed 's/\"//gI' )
      case "$OS_VERSION" in
           "16.04")
@@ -15,7 +14,7 @@
      esac
 
 
-     printf "\\tInstall libclang.so in /usr/local/lib.\\n"
+     printf "\\tInstall libclang.so in /usr/lib.\\n"
 	if [ ! -d $ROOT/lib/clang ]
 	then
 		mkdir -p $ROOT/lib/clang
@@ -23,11 +22,12 @@
 		cd  $ROOT/lib/clang
 		mkdir -p clang
 		tar -xvf clang.tar.xz --strip-components 1 -C ./clang
-		if ! sudo ln -s  $ROOT/lib/clang/clang/lib/libclang.so /usr/local/lib
+		if ! sudo ln -s  $ROOT/lib/clang/clang/lib/libclang.so.5.0 /usr/lib/libclang.so
 		then
 		     printf "\\tlibclang.so has installed.\\n"
 		fi
 		echo export VNT_INCLUDE="$ROOT/lib/clang/clang/lib/clang/5.0.0/include" >> ~/.bash_profile 
+          echo export LD_LIBRARY_PATH="\$LD_LIBRARY_PATH:$ROOT/lib/clang/clang/lib"
 	fi
 
 	cd $ROOT
