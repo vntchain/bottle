@@ -2,6 +2,7 @@
 	CLANG_URL="http://192.168.9.251:9000/temp/clang.tar.xz"
 	#WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-darwin-bin.tar.gz"
 	WASMCEPTION_URL="http://192.168.9.251:9000/temp/wasmception-darwin-bin.tar.gz"
+	
 	printf "\\tChecking xcode-select installation.\\n"
 	if ! XCODESELECT=$( command -v xcode-select)
 	then
@@ -33,25 +34,5 @@
 	cd $ROOT
 	go install -ldflags -s -v ./...
 
-	printf "\\tInstall wasmception.\\n"
-	if [ ! -d $ROOT/lib/wasmception ]
-	then
-		mkdir -p $ROOT/lib/wasmception
-		wget  -O $ROOT/lib/wasmception/wasmception.tar.xz $WASMCEPTION_URL
-		cd  $ROOT/lib/wasmception
-		mkdir -p wasmception
-		tar -xvf wasmception.tar.xz  -C ./wasmception
-		# if ! sudo ln -s  $ROOT/lib/clang/clang/lib/libclang.dylib /usr/local/lib
-		# then
-		#      printf "\\tlibclang.dylib has installed.\\n"
-		# fi
-		echo export VNT_WASMCEPTION="$ROOT/lib/wasmception/wasmception" >> ~/.bash_profile 
-	fi
+	
 
-
-
-	function print_instructions()
-	{
-		printf "\\tcd %s; ./bottle --help\\n\\n" "build/bin/"
-	     return 0
-	}
