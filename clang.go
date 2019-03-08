@@ -37,13 +37,12 @@ func cmd(args []string) int {
 	defer idx.Dispose()
 	var tu clang.TranslationUnit
 	// tu = idx.ParseTranslationUnit("", []string{"-I", includeDir, "-x", "c", "-"}, nil, 0)
-	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir}, nil, 0)
-	if args[0] == "<stdin>" { //stdin
-		fmt.Printf("<stdin> \n")
-		tu = idx.ParseTranslationUnit("", []string{"-I", includeDir, "-x", "c", "-"}, nil, 0)
-	} else {
-		tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir}, nil, 0)
-	}
+	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir, "-I", vntIncludeFlag}, nil, 0)
+	// if args[0] == "<stdin>" { //stdin
+	// 	tu = idx.ParseTranslationUnit("", []string{"-I", includeDir, "-x", "c", "-"}, nil, 0)
+	// } else {
+	// 	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir, "-I", "/Users/weisaizhang/Documents/go/src/github.com/vntchain/bottle/lib/clang/clang/lib/clang/5.0.0/include"}, nil, 0)
+	// }
 
 	defer tu.Dispose()
 

@@ -25,8 +25,6 @@ import (
 )
 
 func main() {
-
-	// app.Action = gvnt
 	app.HideVersion = true // we have a command to print the version
 	app.Copyright = "Copyright 2018-2019 The bottle Authors"
 	app.Commands = []cli.Command{

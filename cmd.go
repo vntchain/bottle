@@ -147,8 +147,12 @@ func compile(ctx *cli.Context) error {
 	}
 
 	if wasmCeptionFlag = os.Getenv("VNT_WASMCEPTION"); wasmCeptionFlag == "" {
-		return fmt.Errorf("未找到VNT_WASMCEPTION的环境变量，请按照readme的步骤下载并设置wasmception")
+		return fmt.Errorf("未找到VNT_WASMCEPTION的环境变量，请先执行make bottle")
 	}
+	if vntIncludeFlag = os.Getenv("VNT_INCLUDE"); vntIncludeFlag == "" {
+		return fmt.Errorf("未找到VNT_INCLUDE的环境变量，请先执行make bottle")
+	}
+
 	code, err := ioutil.ReadFile(codePath)
 	if err != nil {
 		return err

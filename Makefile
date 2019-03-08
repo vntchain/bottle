@@ -1,5 +1,11 @@
+.PHONY: bottle 
 
-all: install
+GOBIN = $(shell pwd)/build/bin
+GO ?= latest
+ARCH=$(shell go env GOARCH)
+MARCH=$(shell go env GOOS)-$(shell go env GOARCH)
 
-install:
-	go install ./...
+all: bottle
+
+bottle: 
+	scripts/env.sh  scripts/build.sh 
