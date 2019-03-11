@@ -5,7 +5,6 @@ PWD="$(pwd)"
 ROOT="$PWD"
 MARCH=$(go env GOOS)
 GOVERSION=$(go version)
-clang_mac_url="http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-apple-darwin.tar.xz"
 clang_dir="clang"
 SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 WASMFILE="${SOURCE_DIR}/set_wasmception.sh"
