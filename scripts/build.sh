@@ -53,14 +53,9 @@ printf "\t ) _ < )(_)(   )(    )(   )(__  )__) \n"
 printf "\t(____/(_____) (__)  (__) (____)(____)\n${txtrst}"
 
 printf "\\n\\tBottle has been successfully built. %02d:%02d:%02d\\n\\n" $(($TIME_END/3600)) $(($TIME_END%3600/60)) $(($TIME_END%60))
-printf "\\tTo verify your installation run the following commands:\\n"
 
 
-function print_instructions()
-{
-   printf "\\tcd %s; ./bottle --help\\n\\n" "build/bin/"
-      return 0
-}
+
 
 print_instructions
 
