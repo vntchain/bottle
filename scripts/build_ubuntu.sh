@@ -1,4 +1,3 @@
-     
      WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
      OS_VERSION=$( cat /etc/os-release | grep ^VERSION_ID | cut -d'=' -f2 | sed 's/\"//gI' )
      case "$OS_VERSION" in
@@ -15,7 +14,7 @@
 
 
      printf "\\tInstall libclang.so in /usr/lib.\\n"
-	if [ ! -d $ROOT/lib/clang ]
+	if [ ! -f $ROOT/lib/clang/clang.tar.xz ]
 	then
 		mkdir -p $ROOT/lib/clang
 		wget  -O $ROOT/lib/clang/clang.tar.xz $CLANG_URL

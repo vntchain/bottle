@@ -8,7 +8,7 @@
 	fi
 
 	printf "\\tInstall libclang.dylib in /usr/local/lib.\\n"
-	if [ ! -d $ROOT/lib/clang ]
+	if [ ! -f $ROOT/lib/clang/clang.tar.xz ]
 	then
 		mkdir -p $ROOT/lib/clang
 		wget  -O $ROOT/lib/clang/clang.tar.xz $CLANG_URL
