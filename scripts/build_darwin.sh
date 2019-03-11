@@ -19,11 +19,15 @@
 		then
 		     printf "\\tlibclang.dylib has installed.\\n"
 		fi
-		
 	fi
 
 	cd $ROOT
-	go install -ldflags -s -v ./...
+	if ! go install -ldflags -s -v ./...
+     then 
+          printf "\\tError compiling bottle.\\n"
+          printf "\\tExiting now.\\n\\n"
+          exit 1;
+     fi 
 
 	function print_instructions()
 	{	 
