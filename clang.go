@@ -221,6 +221,7 @@ func createStructList(cursor, parent clang.Cursor) {
 //c:main6.cpp@S@main6.cpp@8255
 func getGlobalVarDecl(cursor, parent clang.Cursor) {
 	decl := cursor.Kind()
+	pdecl := parent.Kind()
 	cursortype := cursor.Type().Spelling()
 	cursorname := cursor.Spelling()
 	allstruct := []string{}
@@ -228,7 +229,7 @@ func getGlobalVarDecl(cursor, parent clang.Cursor) {
 		allstruct = append(allstruct, k)
 	}
 	structnames := strings.Join(allstruct, "|")
-	if decl == clang.Cursor_VarDecl {
+	if decl == clang.Cursor_VarDecl && pdecl == clang.Cursor_TranslationUnit {
 		file, _, _, offset := cursor.Location().FileLocation()
 		// fmt.Printf("\n******          %s: %s (%s) (%s)\n", cursor.Kind().Spelling(), cursor.Spelling(), cursor.USR(), cursor.Type().Spelling())
 		// fmt.Printf("******parent    %s: %s (%s) (%s)\n", parent.Kind().Spelling(), parent.Spelling(), parent.USR(), parent.Type().Spelling())

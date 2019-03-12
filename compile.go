@@ -423,13 +423,7 @@ const initializeVariables = "\nInitializeVariables();"
 // InitializeVariables用于在constructor方法里存储key的初始化值
 func (gen *abiGen) insertRegistryCode() []byte {
 	initList(varLists.Root)
-	// jsonres, _ := json.Marshal(varLists.Root)
-	// fmt.Printf("res1 %s\n", jsonres)
 	RecursiveVarLists(varLists.Root, "", "")
-
-	// jsonres, _ = json.Marshal(varLists.Root)
-	// fmt.Printf("res2 %s\n", jsonres)
-
 	sym := parseKey()
 	insert := "\n"
 	for k, v1 := range sym {
