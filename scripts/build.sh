@@ -9,6 +9,10 @@ clang_dir="clang"
 SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 WASMFILE="${SOURCE_DIR}/set_wasmception.sh"
 
+txtbld=$(tput bold)
+bldred=${txtbld}$(tput setaf 1)
+txtrst=$(tput sgr0)
+
 function Build_Linux {
      echo "linux"
 }
@@ -52,9 +56,6 @@ printf "\t ) _ < )(_)(   )(    )(   )(__  )__) \n"
 printf "\t(____/(_____) (__)  (__) (____)(____)\n${txtrst}"
 
 printf "\\n\\tBottle has been successfully built. %02d:%02d:%02d\\n\\n" $(($TIME_END/3600)) $(($TIME_END%3600/60)) $(($TIME_END%60))
-
-
-
 
 print_instructions
 

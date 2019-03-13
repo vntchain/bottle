@@ -8,7 +8,7 @@
 	fi
 
 	printf "\\tInstall libclang.dylib in /usr/local/lib.\\n"
-	if [ ! -d $ROOT/lib/clang ]
+	if [ ! -f $ROOT/lib/clang/clang.tar.xz ]
 	then
 		mkdir -p $ROOT/lib/clang
 		wget  -O $ROOT/lib/clang/clang.tar.xz $CLANG_URL
@@ -19,11 +19,15 @@
 		then
 		     printf "\\tlibclang.dylib has installed.\\n"
 		fi
-		
 	fi
 
 	cd $ROOT
-	go install -ldflags -s -v ./...
+	if ! go install -ldflags -s -v ./...
+     then 
+          printf "\\tError compiling bottle.\\n"
+          printf "\\tExiting now.\\n\\n"
+          exit 1;
+     fi 
 
 	function print_instructions()
 	{	 

@@ -1,5 +1,5 @@
      printf "\\tInstall wasmception.\\n"
-	if [ ! -d $ROOT/lib/wasmception ]
+	if [ ! -f $ROOT/lib/wasmception/wasmception.tar.xz ]
 	then
 		mkdir -p $ROOT/lib/wasmception
 		wget  -O $ROOT/lib/wasmception/wasmception.tar.xz $WASMCEPTION_URL
