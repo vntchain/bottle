@@ -52,15 +52,15 @@ func readfile(fi *os.File) []ContentPerLine {
 	offset := 0
 	for {
 		a, c := br.ReadBytes('\n')
-		if c == io.EOF {
-			break
-		}
 		// contents = append(contents, string(a))
 		contensPerLine = append(contensPerLine, ContentPerLine{
 			Content: a,
 			Offset:  offset,
 		})
 		offset += len(a)
+		if c == io.EOF {
+			break
+		}
 	}
 	// for i, v := range contensPerLine {
 	// 	fmt.Printf("line %d content %s\n", i, v)
