@@ -400,7 +400,6 @@ func getFunctionInfo(cursor, parent clang.Cursor) FunctionInfo {
 	} else {
 		payable = false
 	}
-	// fmt.Printf("content %s x1 %d\n", fileContent[file.Name()][x1-1].Content, x1)
 	return FunctionInfo{
 		Name:      cursor.Spelling(),
 		Signature: cursor.Type().Spelling(),
