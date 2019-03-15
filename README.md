@@ -33,7 +33,7 @@ COMMANDS:
    help, h     Shows a list of commands or help for one command
    
 COMPILE OPTIONS:
-  --code value  Specific a contract code path, - for STDIN
+  --code value  Specific a contract code path
   --include     Specific the head file directory need by contract
   --output      Specific a output directory path
   
@@ -47,7 +47,7 @@ DECOMPRESS OPTIONS:
   --output      Specific a output directory path
   
 HINT OPTIONS:
-  --code value  Specific a contract code path, - for STDIN
+  --code value  Specific a contract code path
   
 GLOBAL OPTIONS:
   --help, -h  show help

@@ -36,13 +36,7 @@ func cmd(args []string) int {
 	idx := clang.NewIndex(0, 1) //显示diagnostics
 	defer idx.Dispose()
 	var tu clang.TranslationUnit
-	// tu = idx.ParseTranslationUnit("", []string{"-I", includeDir, "-x", "c", "-"}, nil, 0)
 	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir, "-I", vntIncludeFlag}, nil, 0)
-	// if args[0] == "<stdin>" { //stdin
-	// 	tu = idx.ParseTranslationUnit("", []string{"-I", includeDir, "-x", "c", "-"}, nil, 0)
-	// } else {
-	// 	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir, "-I", "/Users/weisaizhang/Documents/go/src/github.com/vntchain/bottle/lib/clang/clang/lib/clang/5.0.0/include"}, nil, 0)
-	// }
 
 	defer tu.Dispose()
 
@@ -369,16 +363,12 @@ func getFunc(cursor, parent clang.Cursor) {
 func createFileContent(cursor, parent clang.Cursor) {
 	file, _, _, _ := cursor.Location().FileLocation()
 	if _, ok := fileContent[file.Name()]; !ok {
-		if file.Name() == "<stdin>" {
-			fileContent[file.Name()] = readfile(os.Stdin)
-		} else {
-			fi, err := os.Open(file.Name())
-			if err != nil {
-				panic(err.Error())
-			}
-			fileContent[file.Name()] = readfile(fi)
-			fi.Close()
+		fi, err := os.Open(file.Name())
+		if err != nil {
+			panic(err.Error())
 		}
+		fileContent[file.Name()] = readfile(fi)
+		fi.Close()
 	}
 }
 

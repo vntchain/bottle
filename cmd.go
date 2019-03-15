@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"time"
 
 	"github.com/vntchain/go-vnt/accounts/abi"
 	cmdutils "github.com/vntchain/go-vnt/cmd/utils"
@@ -38,7 +37,7 @@ var (
 	// flags that configure the node
 	contractCodeFlag = cli.StringFlag{
 		Name:  "code",
-		Usage: "Specific a contract code path, - for STDIN",
+		Usage: "Specific a contract code path",
 	}
 	outputFlag = cmdutils.DirectoryFlag{
 		Name:  "output",
@@ -128,7 +127,7 @@ Contract hint
 )
 
 func compile(ctx *cli.Context) error {
-	start := time.Now()
+	// start := time.Now()
 	codePath = ctx.String(contractCodeFlag.Name)
 	includeDir = ctx.String(includeFlag.Name)
 	outputDir = ctx.String(outputFlag.Name)
@@ -146,11 +145,11 @@ func compile(ctx *cli.Context) error {
 		includeDir = path.Dir(codePath)
 	}
 
-	if wasmCeptionFlag = os.Getenv("VNT_WASMCEPTION"); wasmCeptionFlag == "" {
-		return fmt.Errorf("未找到VNT_WASMCEPTION的环境变量，请先执行make bottle")
+	if err := getWasmceiptionEnv(); err != nil {
+		return err
 	}
-	if vntIncludeFlag = os.Getenv("VNT_INCLUDE"); vntIncludeFlag == "" {
-		return fmt.Errorf("未找到VNT_INCLUDE的环境变量，请先执行make bottle")
+	if err := getIncludeEnv(); err != nil {
+		return err
 	}
 
 	code, err := ioutil.ReadFile(codePath)
@@ -223,7 +222,6 @@ func compile(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
 	fmt.Printf("Input file\n")
 	fmt.Printf("Contract path :%s\n", codePath)
 	fmt.Printf("Output file\n")
@@ -233,7 +231,7 @@ func compile(ctx *cli.Context) error {
 	fmt.Printf("Compress Data path: %s\n", cpsPath)
 	fmt.Printf("Compress Hex Data path: %s\n", hexPath)
 	fmt.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
-	fmt.Printf("time duration 2:", time.Since(start))
+	// fmt.Printf("time duration 2:", time.Since(start))
 	return nil
 }
 
@@ -326,25 +324,14 @@ func hint(ctx *cli.Context) error {
 	// fileContent = readfile(codePath)
 	var code []byte
 	var err error
-	if codePath != "-" {
-		code, err = ioutil.ReadFile(codePath)
-		if err != nil {
-			return err
-		}
-
-	} else {
-		stdin := os.Stdin
-		code, err = ioutil.ReadAll(stdin)
-		if err != nil {
-			return err
-		}
-		codePath = "<stdin>"
-		_, err = stdin.Write(code)
-		if err != nil {
-			return err
-		}
+	code, err = ioutil.ReadFile(codePath)
+	if err != nil {
+		return err
 	}
 
+	if err := getIncludeEnv(); err != nil {
+		return err
+	}
 	cmd([]string{codePath})
 	// jsonres, _ := json.Marshal(varLists)
 	// fmt.Printf("vallist %s\n", jsonres)
