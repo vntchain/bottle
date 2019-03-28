@@ -46,7 +46,7 @@
      cd  $ROOT/lib/llvm
      mkdir -p llvm_build
      cd llvm_build
-     if ! cmake ../llvm
+     if ! cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" ../llvm
      then
           printf "\\n\\tUnable to cmake llvm..\\n\\n"
 		printf "\\tExiting now.\\n"

@@ -13,9 +13,6 @@ txtbld=$(tput bold)
 bldred=${txtbld}$(tput setaf 1)
 txtrst=$(tput sgr0)
 
-function Build_Linux {
-     echo "linux"
-}
 
 if [ "$MARCH" = "darwin" ];then
    FILE="${SOURCE_DIR}/build_darwin.sh"
