@@ -71,7 +71,6 @@ func readfile(fi *os.File) []ContentPerLine {
 func GetLineNumber(offset int, filecontent []ContentPerLine) (int, int) {
 	for i := 1; i < len(filecontent); i++ {
 		if offset >= filecontent[i-1].Offset && offset < filecontent[i].Offset {
-			fmt.Printf("OFFSET %d I %d (i-1)offset %d (i)offset %d\n", offset, i, filecontent[i-1].Offset, filecontent[i].Offset)
 			return i, offset - filecontent[i-1].Offset + 1
 		}
 	}
@@ -152,7 +151,7 @@ func writeFile(file string, content []byte) error {
 }
 
 func isSupportedType(tp string) bool {
-	types := []string{"int32", "int64", "uint32", "uint64", "uint256", "string", "address", "bool", "void"}
+	types := []string{"int32", "int64", "uint32", "uint64", "uint256", "string", "address", "bool", "_Bool", "void"}
 	typesmap := map[string]bool{}
 	for _, v := range types {
 		typesmap[v] = true
