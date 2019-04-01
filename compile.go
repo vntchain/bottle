@@ -132,8 +132,7 @@ type abiGen struct {
 }
 
 var fileContent = map[string][]ContentPerLine{}
-var wasmCeptionFlag string
-var vntIncludeFlag string
+
 
 var (
 	codePath          string

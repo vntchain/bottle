@@ -145,13 +145,6 @@ func compile(ctx *cli.Context) error {
 		includeDir = path.Dir(codePath)
 	}
 
-	if err := getWasmceiptionEnv(); err != nil {
-		return err
-	}
-	if err := getIncludeEnv(); err != nil {
-		return err
-	}
-
 	code, err := ioutil.ReadFile(codePath)
 	if err != nil {
 		return err
@@ -329,9 +322,6 @@ func hint(ctx *cli.Context) error {
 		return err
 	}
 
-	if err := getIncludeEnv(); err != nil {
-		return err
-	}
 	cmd([]string{codePath})
 	// jsonres, _ := json.Marshal(varLists)
 	// fmt.Printf("vallist %s\n", jsonres)

@@ -7,14 +7,23 @@ MARCH=$(go env GOOS)
 GOVERSION=$(go version)
 clang_dir="clang"
 SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-WASMFILE="${SOURCE_DIR}/set_wasmception.sh"
+WASMFILE="${SOURCE_DIR}/build_wasmception.sh"
+BOTTLEFILE="${SOURCE_DIR}/build_bottle.sh"
 
 txtbld=$(tput bold)
 bldred=${txtbld}$(tput setaf 1)
 txtrst=$(tput sgr0)
 
+if ! GO=$( command -v go)
+then
+     printf "\\n\\tGo must be installed in order to proceed.\\n\\n"
+     printf "\\tExiting now.\\n"
+     exit 1
+fi
+
 
 if [ "$MARCH" = "darwin" ];then
+   echo "build bottle in darwin"
    FILE="${SOURCE_DIR}/build_darwin.sh"
 elif [ "$MARCH" = "linux" ];then
    if [ ! -e /etc/os-release ]; then
@@ -28,11 +37,11 @@ elif [ "$MARCH" = "linux" ];then
    OS_NAME=$( cat /etc/os-release | grep ^NAME | cut -d'=' -f2 | sed 's/\"//gI' )
    case "$OS_NAME" in
       "CentOS Linux")
-         echo "centos"
+         echo "build bottle in centos"
          FILE="${SOURCE_DIR}/build_centos.sh"
       ;;
       "Ubuntu")
-         echo "ubuntu"
+         echo "build bottle in ubuntu"
          FILE="${SOURCE_DIR}/build_ubuntu.sh"
       ;;
       *)
@@ -43,6 +52,7 @@ fi
 
 . "$FILE"
 . "$WASMFILE"
+. "$BOTTLEFILE"
 
 
 TIME_END=$(( $(date -u +%s) - ${TIME_BEGIN} ))

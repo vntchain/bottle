@@ -9,3 +9,7 @@ all: bottle
 
 bottle: 
 	scripts/env.sh  scripts/build.sh 
+
+clean:
+     rm -fr build/
+	
