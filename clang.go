@@ -37,7 +37,6 @@ func cmd(args []string) int {
 	defer idx.Dispose()
 	var tu clang.TranslationUnit
 	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir, "-I", vntIncludeFlag}, nil, 0)
-
 	defer tu.Dispose()
 
 	diagnostics := tu.Diagnostics()

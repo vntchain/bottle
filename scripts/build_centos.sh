@@ -24,29 +24,28 @@
      
      printf "\\tBuild llvm + clang\\n"
 
-	if [ ! -f $ROOT/lib/llvm/clang.tar.xz ]
+	if [ ! -f $ROOT/build/lib/llvm/clang.tar.xz ]
 	then
-		mkdir -p $ROOT/lib/llvm
-		wget  -O $ROOT/lib/llvm/clang.tar.xz $CLANG_URL
-		cd  $ROOT/lib/llvm
+		mkdir -p $ROOT/build/lib/llvm
+		wget  -O $ROOT/build/lib/llvm/clang.tar.xz $CLANG_URL
+		cd  $ROOT/build/lib/llvm
 		mkdir -p clang
 		tar -xvf clang.tar.xz --strip-components 1 -C ./clang
 	fi
 
-     if [ ! -f $ROOT/lib/llvm/llvm.tar.xz ]
+     if [ ! -f $ROOT/build/lib/llvm/llvm.tar.xz ]
 	then
-		mkdir -p $ROOT/lib/llvm
-		wget  -O $ROOT/lib/llvm/llvm.tar.xz $LLVM_URL
-		cd  $ROOT/lib/llvm
+		mkdir -p $ROOT/build/lib/llvm
+		wget  -O $ROOT/build/lib/llvm/llvm.tar.xz $LLVM_URL
+		cd  $ROOT/build/lib/llvm
 		mkdir -p llvm
 		tar -xvf llvm.tar.xz --strip-components 1 -C ./llvm
-          mv  $ROOT/lib/llvm/clang $ROOT/lib/llvm/llvm/tools
+          mv  $ROOT/build/lib/llvm/clang $ROOT/build/lib/llvm/llvm/tools
 	fi
 
-     cd  $ROOT/lib/llvm
-     mkdir -p llvm_build
-     cd llvm_build
-     if ! cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" ../llvm
+     mkdir -p  $ROOT/build/lib/clang/clang
+     cd $ROOT/build/lib/clang/clang
+     if ! cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" ../../llvm/llvm
      then
           printf "\\n\\tUnable to cmake llvm..\\n\\n"
 		printf "\\tExiting now.\\n"
@@ -60,26 +59,11 @@
           printf "\\tExiting now.\\n\\n"
           exit 1;
      fi
-
-     if ! sudo ln -s  $ROOT/lib/llvm/llvm_build/lib/libclang.so.5.0 /usr/lib/libclang.so
-     then
-          printf "\\tlibclang.so has installed.\\n"
-     fi
-
-     cd $ROOT
-	if ! go install -ldflags -s -v ./...
-     then 
-          printf "\\tError compiling bottle.\\n"
-          printf "\\tExiting now.\\n\\n"
-          exit 1;
-     fi 
+     printf "\\tBuild llvm + clang successfully.\\n"
 
      function print_instructions()
 	{	 
-		printf "\\tAdd\\n"
-		printf "\\texport VNT_INCLUDE=\"$ROOT/lib/llvm/llvm_build/lib/clang/5.0.0/include\"\\n" 
-          printf "\\texport LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:$ROOT/lib/llvm/llvm_build/lib\"\\n" 
-		printf "\\tto .bash_profile or another initialization script for your terminal and restart your terminal\\n"
+		printf "\\tDONOT REMOVE BUILD DIRECTORY UNLESS YOU WANT TO REMOVE BOTTLE\\n"
 		printf "\\tTo verify your installation run the following commands:\\n"
 		printf "\\tcd %s; ./bottle --help\\n\\n" "build/bin/"
 		return 0
