@@ -13,26 +13,17 @@
      esac
 
 
-     printf "\\tInstall libclang.so in /usr/lib.\\n"
+     printf "\\tInstall libclang in /usr/lib.\\n"
 	if [ ! -f $ROOT/build/lib/clang/clang.tar.xz ]
 	then
 		mkdir -p $ROOT/build/lib/clang
 		wget  -O $ROOT/build/lib/clang/clang.tar.xz $CLANG_URL
 		cd  $ROOT/build/lib/clang
 		mkdir -p clang
-		tar -xvf clang.tar.xz --strip-components 1 -C ./clang
+		tar -xf clang.tar.xz --strip-components 1 -C ./clang
 		# if ! sudo ln -s  $ROOT/build/lib/clang/clang/lib/libclang.so.5.0 /usr/lib/libclang.so
 		# then
 		#      printf "\\tlibclang.so has installed.\\n"
 		# fi
 	fi
-	printf "\\tInstall libclang.dylib successfully.\\n"
-
-
-     function print_instructions()
-	{	 
-		printf "\\tDONOT REMOVE BUILD DIRECTORY UNLESS YOU WANT TO REMOVE BOTTLE\\n"
-		printf "\\tTo verify your installation run the following commands:\\n"
-		printf "\\tcd %s; ./bottle --help\\n\\n" "build/bin/"
-		return 0
-	}
+	printf "\\tInstall libclang successfully.\\n"

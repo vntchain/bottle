@@ -64,7 +64,19 @@ printf "\t(____/(_____) (__)  (__) (____)(____)\n${txtrst}"
 
 printf "\\n\\tBottle has been successfully built. %02d:%02d:%02d\\n\\n" $(($TIME_END/3600)) $(($TIME_END%3600/60)) $(($TIME_END%60))
 
+function print_instructions()
+{	 
+   printf "\\t************************************************************************\\n" 
+   printf "\\t*****DONOT REMOVE **BUILD** FOLDER UNLESS YOU WANT TO DELETE BOTTLE*****\\n" 
+   printf "\\t************************************************************************\\n"
+   printf "\\n"  
+   printf "\\tTo verify your installation run the following commands:\\n"
+   printf "\\tcd %s; ./bottle --help\\n\\n" "build/bin/"
+   return 0
+}
+
 print_instructions
+
 
 
 
