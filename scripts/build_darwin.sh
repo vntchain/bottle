@@ -15,6 +15,7 @@
 		cd  $ROOT/build/lib/clang
 		mkdir -p clang
 		tar -xf clang.tar.xz --strip-components 1 -C ./clang
+		rm clang.tar.xz
 	fi
 	printf "\\tInstall libclang successfully.\\n"
 

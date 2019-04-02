@@ -1,6 +1,3 @@
-     # WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
-     # LLVM_URL="http://releases.llvm.org/5.0.0/llvm-5.0.0.src.tar.xz"
-     # CLANG_URL="http://releases.llvm.org/5.0.0/cfe-5.0.0.src.tar.xz" 
      WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
      LLVM_URL="http://releases.llvm.org/5.0.0/llvm-5.0.0.src.tar.xz"
      CLANG_URL="http://releases.llvm.org/5.0.0/cfe-5.0.0.src.tar.xz" 
@@ -33,7 +30,8 @@
 		wget  -O $ROOT/build/lib/llvm/clang.tar.xz $CLANG_URL
 		cd  $ROOT/build/lib/llvm
 		mkdir -p clang
-		tar -xvf clang.tar.xz --strip-components 1 -C ./clang
+		tar -xf clang.tar.xz --strip-components 1 -C ./clang
+          rm clang.tar.xz
 	fi
 
      if [ ! -f $ROOT/build/lib/llvm/llvm.tar.xz ]
@@ -42,7 +40,8 @@
 		wget  -O $ROOT/build/lib/llvm/llvm.tar.xz $LLVM_URL
 		cd  $ROOT/build/lib/llvm
 		mkdir -p llvm
-		tar -xvf llvm.tar.xz --strip-components 1 -C ./llvm
+		tar -xf llvm.tar.xz --strip-components 1 -C ./llvm
+          rm llvm.tar.xz
           mv  $ROOT/build/lib/llvm/clang $ROOT/build/lib/llvm/llvm/tools
 	fi
 

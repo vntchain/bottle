@@ -6,5 +6,6 @@
 		cd  $ROOT/build/lib/wasmception
 		mkdir -p wasmception
 		tar -xf wasmception.tar.xz  -C ./wasmception
+		rm wasmception.tar.xz
 	fi
 	printf "\\tInstall wasmception successfully.\\n"
