@@ -1,3 +1,6 @@
+     # WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
+     # LLVM_URL="http://releases.llvm.org/5.0.0/llvm-5.0.0.src.tar.xz"
+     # CLANG_URL="http://releases.llvm.org/5.0.0/cfe-5.0.0.src.tar.xz" 
      WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
      LLVM_URL="http://releases.llvm.org/5.0.0/llvm-5.0.0.src.tar.xz"
      CLANG_URL="http://releases.llvm.org/5.0.0/cfe-5.0.0.src.tar.xz" 
@@ -16,7 +19,7 @@
      REQUIRE_VERSION="3.4.3"
      if version_gt $REQUIRE_VERSION $CMAKE_VERSION ; then
           printf "\\n\\tCmake $REQUIRE_VERSION is the minimum required..\\n\\n"
-          printf "\\n\\Please update cmake..\\n\\n"
+          printf "\\n\\tPlease update cmake..\\n\\n"
 		printf "\\tExiting now.\\n"
 		exit 1
      fi
@@ -61,10 +64,4 @@
      fi
      printf "\\tBuild llvm + clang successfully.\\n"
 
-     function print_instructions()
-	{	 
-		printf "\\tDONOT REMOVE BUILD DIRECTORY UNLESS YOU WANT TO REMOVE BOTTLE\\n"
-		printf "\\tTo verify your installation run the following commands:\\n"
-		printf "\\tcd %s; ./bottle --help\\n\\n" "build/bin/"
-		return 0
-	}
+ 

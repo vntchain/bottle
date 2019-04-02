@@ -11,5 +11,5 @@ bottle:
 	scripts/env.sh  scripts/build.sh 
 
 clean:
-     rm -fr build/
+	rm -fr build/
 	
