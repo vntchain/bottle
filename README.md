@@ -81,20 +81,20 @@ make bottle
 
 ## 使用
 
-###编译智能合约代码
+### 编译智能合约代码
 
 ```
 bottle compile -code <your contract path> -output <the path your choose to save the compiled contract file>
 ```
 通过以上命令可以获得后缀名为``compress``的编译文件和后缀名为``abi``的abi文件，使用compress文件可以部署智能合约到``VNT``网络，通过abi文件可以访问``VNT``网络中的智能合约
 
-###智能合约代码纠错及提示
+### 智能合约代码纠错及提示
 
 ```
 bottle hint -code <your contract path>
 ```
 
-###Bottle命令
+### Bottle命令
 ```
 NAME:
    bottle - the bottle command line interface
