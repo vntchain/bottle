@@ -56,28 +56,6 @@ make bottle
 ./build/bin/bottle
 ```
 
-### Centos编译
-
-将``bottle``代码clone到选择的目录
-
-```
-git clone https://github.com/vntchain/bottle
-```
-
-确保系统已经安装了``cmake``且版本>=3.4.3，以及[go](https://golang.org/)编译器，``go``的安装请参考``go``的官方文档
-
-然后使用以下命令编译得到``bottle``
-
-```
-cd bottle
-make bottle
-```
-
-最后使用以下命令运行bottle
-
-```
-./build/bin/bottle
-```
 
 ## 使用
 
