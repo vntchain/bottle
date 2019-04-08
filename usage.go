@@ -22,12 +22,12 @@ import (
 	"io"
 	"sort"
 
-	"github.com/vntchain/go-vnt/cmd/utils"
 	cli "gopkg.in/urfave/cli.v1"
 )
 
-// AppHelpTemplate is the test template for the default, global app help topic.
-var AppHelpTemplate = `NAME:
+var (
+	// AppHelpTemplate is the test template for the default, global app help topic.
+	AppHelpTemplate = `NAME:
    {{.App.Name}} - {{.App.Usage}}
 
    Copyright 2018-2019 The bottle Authors
@@ -52,6 +52,17 @@ COPYRIGHT:
    {{.App.Copyright}}
    {{end}}
 `
+	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} [arguments...]
+{{if .cmd.Description}}{{.cmd.Description}}
+{{end}}{{if .cmd.Subcommands}}
+SUBCOMMANDS:
+	{{range .cmd.Subcommands}}{{.Name}}{{with .ShortName}}, {{.}}{{end}}{{ "\t" }}{{.Usage}}
+	{{end}}{{end}}{{if .categorizedFlags}}
+{{range $idx, $categorized := .categorizedFlags}}{{$categorized.Name}} OPTIONS:
+{{range $categorized.Flags}}{{"\t"}}{{.}}
+{{end}}
+{{end}}{{end}}`
+)
 
 // flagGroup is a collection of flags belonging to a single topic.
 type flagGroup struct {
@@ -167,7 +178,7 @@ func init() {
 			}
 			// Render out custom usage screen
 			originalHelpPrinter(w, tmpl, helpData{data, AppHelpFlagGroups})
-		} else if tmpl == utils.CommandHelpTemplate {
+		} else if tmpl == CommandHelpTemplate {
 			// Iterate over all command specific flags and categorize them
 			categorized := make(map[string][]cli.Flag)
 			for _, flag := range data.(cli.Command).Flags {

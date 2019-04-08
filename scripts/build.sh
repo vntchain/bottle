@@ -9,6 +9,7 @@ clang_dir="clang"
 SOURCE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 WASMFILE="${SOURCE_DIR}/build_wasmception.sh"
 BOTTLEFILE="${SOURCE_DIR}/build_bottle.sh"
+COMMITID=$(git rev-parse HEAD)
 
 txtbld=$(tput bold)
 bldred=${txtbld}$(tput setaf 1)

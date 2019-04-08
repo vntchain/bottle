@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/vntchain/go-vnt/accounts/abi"
 	cmdutils "github.com/vntchain/go-vnt/cmd/utils"
@@ -31,9 +32,40 @@ import (
 	cli "gopkg.in/urfave/cli.v1"
 )
 
+const (
+	VersionMajor = 0      // Major version component of the current release
+	VersionMinor = 6      // Minor version component of the current release
+	VersionPatch = 0      // Patch version component of the current release
+	VersionMeta  = "beta" // Version metadata to append to the version string
+)
+
+// Version holds the textual version string.
+var Version = func() string {
+	v := fmt.Sprintf("%d.%d.%d", VersionMajor, VersionMinor, VersionPatch)
+	if VersionMeta != "" {
+		v += "-" + VersionMeta
+	}
+	return v
+}()
+
+// NewApp creates an app with sane defaults.
+func NewApp(gitCommit, usage string) *cli.App {
+	app := cli.NewApp()
+	app.Name = filepath.Base(os.Args[0])
+	app.Author = ""
+	//app.Authors = nil
+	app.Email = ""
+	app.Version = Version
+	if len(gitCommit) >= 8 {
+		app.Version += "-" + gitCommit[:8]
+	}
+	app.Usage = usage
+	return app
+}
+
 var (
-	gitCommit = ""
-	app       = cmdutils.NewApp(gitCommit, "the bottle command line interface")
+	gitCommit string
+	app       = NewApp(gitCommit, "the bottle command line interface")
 	// flags that configure the node
 	contractCodeFlag = cli.StringFlag{
 		Name:  "code",

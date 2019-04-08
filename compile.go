@@ -36,8 +36,8 @@ import (
 const (
 	//methodReg     = `(VNT_WASM_EXPORT\n)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_]+)(\s*)(\({1})([a-zA-Z0-9_\s,]*)(\){1})`
 	methodReg     = `(MUTABLE|UNMUTABLE\n)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_\$]+)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})([^{]*)({){1}`
-	openParenReg  = `(\s*)\((\s*)`
-	closeParenReg = `(\s*)\)(\s*)`
+	openParenReg  = `(\s*)(\()(\s*)`
+	closeParenReg = `(\s*)(\))(\s*)`
 	commaReg      = `(\s*),(\s*)`
 	spaceReg      = `(\s+)`
 	letterReg     = `[a-zA-Z0-9_\$]{1,}`
@@ -133,7 +133,6 @@ type abiGen struct {
 
 var fileContent = map[string][]ContentPerLine{}
 
-
 var (
 	codePath          string
 	outputDir         string
@@ -201,9 +200,24 @@ func removeSymbol(input string) []string {
 
 	re = regexp.MustCompile(spaceReg)
 	str = re.ReplaceAllString(str, " ")
-
 	re = regexp.MustCompile(letterReg)
 	final := re.FindAllString(str, -1)
+	return final
+}
+
+func splitArgs(input string) []string {
+	s := strings.TrimSpace(input)
+	re := regexp.MustCompile(openParenReg)
+	str := re.ReplaceAllString(s, "(")
+
+	re = regexp.MustCompile(closeParenReg)
+	str = re.ReplaceAllString(str, ")")
+
+	re = regexp.MustCompile(spaceReg)
+	str = re.ReplaceAllString(str, " ")
+	re = regexp.MustCompile(`(\(|\)|,)`)
+	final := re.Split(str, -1)
+	final = final[0 : len(final)-1]
 	return final
 }
 

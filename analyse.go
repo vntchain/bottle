@@ -73,7 +73,6 @@ type HintMessage struct {
 }
 type HintMessages []HintMessage
 
-///Users/weisaizhang/Documents/go/src/github.com/ethereum/contract/src/analyse/main.c:12:6: warning: type specifier missing, defaults to 'int' [-Wimplicit-int]
 func (msgs HintMessages) ToString() string {
 	m := ""
 	for i, v := range msgs {
@@ -233,6 +232,7 @@ func (h *Hint) callCheck() (HintMessages, error) {
 	return msgs, nil
 }
 
+//EVENT event_name(indexed[option] param_type param_name)
 func (h *Hint) eventCheck() (HintMessages, error) {
 	var msgs HintMessages
 	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
@@ -256,7 +256,6 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 			} else {
 				//类型判断
 				//indexed位置
-				//string index, address,addres indexed
 				for i := 0; i < len(right); i++ {
 					if !isSupportedType(right[i]) {
 						offset := stridx[0][0]
@@ -271,29 +270,24 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 						continue
 					}
 				}
-				sym := removeSymbol(string(h.Code[stridx[0][0]:stridx[0][1]]))
-				sym = sym[2:]
+				sym := splitArgs(string(h.Code[stridx[0][0]:stridx[0][1]]))
+				sym = sym[1:]
 				for i := 0; i < len(sym); i++ {
-					irregular := false
-					if sym[i] == KWIndexed { //match indexed
-						if i-1 < 0 {
-							irregular = true
-						} else {
-							if !isSupportedType(sym[i-1]) {
-								irregular = true
-							}
+					irregular := true
+					idx := strings.Index(sym[i], KWIndexed)
+					if idx == 0 || idx == -1 {
+						irregular = false
+					}
+					if irregular {
+						offset := stridx[0][0]
+						size := stridx[0][1] - stridx[0][0]
+						line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
+						msg := HintMessage{
+							Message:  "EVENT方法中的indexed写法不规范",
+							Type:     HintTypeError,
+							Location: NewLocation(h.Path, line, lineOffset, size),
 						}
-						if irregular {
-							offset := stridx[0][0]
-							size := stridx[0][1] - stridx[0][0]
-							line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
-							msg := HintMessage{
-								Message:  "EVENT方法中的indexed写法不规范",
-								Type:     HintTypeError,
-								Location: NewLocation(h.Path, line, lineOffset, size),
-							}
-							msgs = append(msgs, msg)
-						}
+						msgs = append(msgs, msg)
 					}
 				}
 			}
