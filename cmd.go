@@ -354,7 +354,10 @@ func hint(ctx *cli.Context) error {
 		return err
 	}
 
-	cmd([]string{codePath})
+	cmdErr := cmd([]string{codePath})
+	if cmdErr != nil {
+		return cmdErr
+	}
 	// jsonres, _ := json.Marshal(varLists)
 	// fmt.Printf("vallist %s\n", jsonres)
 
