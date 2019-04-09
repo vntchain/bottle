@@ -25,7 +25,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
+	"github.com/dollarshaveclub/line"
 	"github.com/vntchain/go-vnt/accounts/abi"
 	cmdutils "github.com/vntchain/go-vnt/cmd/utils"
 	"github.com/vntchain/go-vnt/core/wavm/utils"
@@ -159,7 +161,7 @@ Contract hint
 )
 
 func compile(ctx *cli.Context) error {
-	// start := time.Now()
+	start := time.Now()
 	codePath = ctx.String(contractCodeFlag.Name)
 	includeDir = ctx.String(includeFlag.Name)
 	outputDir = ctx.String(outputFlag.Name)
@@ -167,8 +169,6 @@ func compile(ctx *cli.Context) error {
 		fmt.Printf("Error:No Contract Code\n")
 		os.Exit(-1)
 	}
-	// fmt.Printf("Input file\n")
-	// fmt.Printf("Contract path :%s\n", codePath)
 	mustCFile(codePath)
 	if outputDir == "" {
 		outputDir = path.Join(path.Dir(codePath), "output")
@@ -208,20 +208,18 @@ func compile(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	err = writeFile(path.Join(outputDir, "abi.json"), res)
-	if err != nil {
-		return err
-	}
-	// fmt.Printf("Output file\n")
-	// fmt.Printf("Abi path: %s\n", path.Join(outputDir, "abi.json"))
 	abires, err := abi.JSON(bytes.NewBuffer(res))
 	if err != nil {
 		return err
 	}
-
+	abipath := abires.Constructor.Name + ".abi"
+	err = writeFile(path.Join(outputDir, abipath), res)
+	if err != nil {
+		return err
+	}
 	pre := abigen.insertRegistryCode()
 	// pre = abigen.insertMutableCode(pre)
-	codeOutput := path.Join(outputDir, "precompile.c")
+	codeOutput := path.Join(outputDir, abires.Constructor.Name+"_precompile.c")
 	err = writeFile(codeOutput, pre)
 	if err != nil {
 		return err
@@ -243,24 +241,38 @@ func compile(ctx *cli.Context) error {
 	}
 	hexPath := path.Join(outputDir, abires.Constructor.Name+".hex")
 	hexString := hex.EncodeToString(cpsRes)
-	err = writeFile(hexPath, []byte(hexString))
+	err = writeFile(hexPath, []byte("0x"+hexString))
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Input file\n")
-	fmt.Printf("Contract path :%s\n", codePath)
-	fmt.Printf("Output file\n")
-	fmt.Printf("Abi path: %s\n", path.Join(outputDir, "abi.json"))
-	fmt.Printf("Precompile code path: %s\n", codeOutput)
-	fmt.Printf("Wasm path: %s\n", wasmOutput)
-	fmt.Printf("Compress Data path: %s\n", cpsPath)
-	fmt.Printf("Compress Hex Data path: %s\n", hexPath)
-	fmt.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
-	// fmt.Printf("time duration 2:", time.Since(start))
+	deployCodePath := path.Join(outputDir, abires.Constructor.Name+".js")
+	err = writeFile(deployCodePath, []byte(deployText(string(res), "0x"+hexString)))
+	if err != nil {
+		return err
+	}
+
+	output := line.New(os.Stdout, "", "", line.WhiteColor)
+	li := output.Prefix(">>>").Cyan()
+	li.Printf("Compile finished. %s\n", time.Since(start).String())
+	li.Printf("Input file\n")
+	li = output.Prefix("   ").Cyan()
+	li.Printf("Contract path :%s\n", codePath)
+	li = output.Prefix(">>>").Cyan()
+	li.Printf("Output file\n")
+	li = output.Prefix("   ").Cyan()
+	li.Printf("Abi path: %s\n", path.Join(outputDir, abipath))
+	li.Printf("Precompile code path: %s\n", codeOutput)
+	li.Printf("Wasm path: %s\n", wasmOutput)
+	li.Printf("Compress Data path: %s\n", cpsPath)
+	li.Printf("Compress Hex Data path: %s\n", hexPath)
+	li.Printf("Deploy JS path: %s\n", deployCodePath)
+	li = output.Prefix(">>>").Cyan()
+	li.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
 	return nil
 }
 
 func compress(ctx *cli.Context) error {
+	start := time.Now()
 	wasmPath = ctx.String(wasmFlag.Name)
 	abiPath = ctx.String(abiFlag.Name)
 	outputDir = ctx.String(outputFlag.Name)
@@ -296,16 +308,24 @@ func compress(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Input file\n")
-	fmt.Printf("Wasm path :%s\n", wasmPath)
-	fmt.Printf("Abi path :%s\n", abiPath)
-	fmt.Printf("Output file\n")
-	fmt.Printf("Compress Data path: %s\n", cpsPath)
-	fmt.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
+	output := line.New(os.Stdout, "", "", line.WhiteColor)
+	li := output.Prefix(">>>").Cyan()
+	li.Printf("Compress finished. %s\n", time.Since(start).String())
+	li.Printf("Input file\n")
+	li = output.Prefix("   ").Cyan()
+	li.Printf("Wasm path :%s\n", wasmPath)
+	li.Printf("Abi path :%s\n", abiPath)
+	li = output.Prefix(">>>").Cyan()
+	li.Printf("Output file\n")
+	li = output.Prefix("   ").Cyan()
+	li.Printf("Compress Data path: %s\n", cpsPath)
+	li = output.Prefix(">>>").Cyan()
+	li.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
 	return nil
 }
 
 func decompress(ctx *cli.Context) error {
+	start := time.Now()
 	compressPath = ctx.String(compressFileFlag.Name)
 	outputDir = ctx.String(outputFlag.Name)
 	if compressPath == "" {
@@ -336,11 +356,17 @@ func decompress(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Input file\n")
-	fmt.Printf("Compress file path :%s\n", compressPath)
-	fmt.Printf("Output file\n")
-	fmt.Printf("wasm path: %s\n", wasmoutputPath)
-	fmt.Printf("abi path: %s\n", abioutputPath)
+	output := line.New(os.Stdout, "", "", line.WhiteColor)
+	li := output.Prefix(">>>").Cyan()
+	li.Printf("Decompress finished. %s\n", time.Since(start).String())
+	li.Printf("Input file\n")
+	li = output.Prefix("   ").Cyan()
+	li.Printf("Compress file path :%s\n", compressPath)
+	li = output.Prefix(">>>").Cyan()
+	li.Printf("Output file\n")
+	li = output.Prefix("   ").Cyan()
+	li.Printf("wasm path: %s\n", wasmoutputPath)
+	li.Printf("abi path: %s\n", abioutputPath)
 	return nil
 }
 
