@@ -168,3 +168,20 @@ func escape(input string) string {
 	}
 	return input
 }
+
+func deployText(abi, code string) string {
+	return fmt.Sprintf(`
+	var projectContract = vnt.core.contract(%s);
+	var project = projectContract.new(
+    {
+     	from: vnt.core.accounts[0], 
+     	data: '%s', 
+     	gas: '4000000'
+    }, function (e, contract){
+    	console.log(e, contract);
+    	if (typeof contract.address !== 'undefined') {
+        	console.log('Contract address: ' + contract.address + ' transactionHash: ' + contract.transactionHash);
+   	 	}
+ 	})
+	`, abi, code)
+}

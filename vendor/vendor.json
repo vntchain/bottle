@@ -31,6 +31,12 @@
 			"revisionTime": "2019-02-15T03:41:53Z"
 		},
 		{
+			"checksumSHA1": "XOnUpJKzv4gWvfrzkBrJc/ybIhg=",
+			"path": "github.com/dollarshaveclub/line",
+			"revision": "fc7a351a8b58b63954c6651077ab65c49eae5c22",
+			"revisionTime": "2017-12-19T19:10:08Z"
+		},
+		{
 			"checksumSHA1": "LdDVI3nPPbnnnLAZc+AD1TOsvAA=",
 			"origin": "github.com/vntchain/go-vnt/vendor/github.com/fd/go-nat",
 			"path": "github.com/fd/go-nat",
