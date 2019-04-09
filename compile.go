@@ -215,6 +215,10 @@ func splitArgs(input string) []string {
 
 	re = regexp.MustCompile(spaceReg)
 	str = re.ReplaceAllString(str, " ")
+
+	re = regexp.MustCompile(commaReg)
+	str = re.ReplaceAllString(str, " ")
+
 	re = regexp.MustCompile(`(\(|\)|,)`)
 	final := re.Split(str, -1)
 	final = final[0 : len(final)-1]
