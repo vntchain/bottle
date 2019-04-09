@@ -31,9 +31,9 @@ var KeyPos [][]int
 
 var index = 0
 
-func cmd(args []string) int {
+func cmd(args []string) error {
 	// idx := clang.NewIndex(0, 0)
-	idx := clang.NewIndex(0, 1) //显示diagnostics
+	idx := clang.NewIndex(0, 0) //是否显示diagnostics
 	defer idx.Dispose()
 	var tu clang.TranslationUnit
 	tu = idx.ParseTranslationUnit(args[0], []string{"-I", includeDir, "-I", vntIncludeFlag}, nil, 0)
@@ -43,9 +43,12 @@ func cmd(args []string) int {
 	for _, d := range diagnostics {
 		// fmt.Printf("d %+v\n", d)
 		// fmt.Println(d.Spelling(), d.CategoryText())
+
+		// fmt.Printf("FILE %s %d %d %d", file.Name(), line, colm, offset)
 		// fmt.Println("PROBLEM:", d.Spelling(), " LEVEL:", d.Severity())
+		file, line, colm, _ := d.Location().FileLocation()
 		if d.Severity() == clang.Diagnostic_Error || d.Severity() == clang.Diagnostic_Fatal {
-			// return err
+			return fmt.Errorf("%s:%d:%d: error: %s", file.Name(), line, colm, d.Spelling())
 		}
 	}
 
@@ -95,7 +98,7 @@ func cmd(args []string) int {
 		// fmt.Println("NOTE: There were problems while analyzing the given file")
 	}
 
-	return 0
+	return nil
 }
 
 func createStructList(cursor, parent clang.Cursor) {
@@ -432,7 +435,6 @@ func getVarInFunction(cursor, parent clang.Cursor) {
 		CompoundStmtHash = cursor.HashCursor()
 	case clang.Cursor_VarDecl:
 		varDeclSpell = cursor.Spelling()
-		fmt.Printf("VarDecl Spell %s\n", varDeclSpell)
 	case clang.Cursor_ReturnStmt: //返回值是否是key
 	}
 	// if cursor.Kind() == clang.Cursor_CompoundStmt {

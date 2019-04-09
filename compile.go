@@ -217,7 +217,7 @@ func splitArgs(input string) []string {
 	str = re.ReplaceAllString(str, " ")
 
 	re = regexp.MustCompile(commaReg)
-	str = re.ReplaceAllString(str, " ")
+	str = re.ReplaceAllString(str, ",")
 
 	re = regexp.MustCompile(`(\(|\)|,)`)
 	final := re.Split(str, -1)
@@ -487,39 +487,6 @@ func (gen *abiGen) insertRegistryCode() []byte {
 	}
 	return code
 }
-
-// //将abi和wasm压缩后进行rlp编码
-// func (abi *abiGen) compress(abijson, wasm, compile []byte) []byte {
-// 	wasmcode := contract.WasmCode{
-// 		Code: wasm,
-// 		Abi:  abijson,
-// 	}
-// 	res, err := rlp.EncodeToBytes(wasmcode)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	rlpcps := utils.Compress(res)
-// 	cpsres, err := rlp.EncodeToBytes(rlpcps)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	magic := make([]byte, 4)
-// 	binary.LittleEndian.PutUint32(magic, utils.MAGIC)
-// 	return append(magic, cpsres...)
-// }
-
-// func (gen *abiGen) insertMutableCode(code []byte) []byte {
-// 	reg := regexp.MustCompile(functionReg)
-// 	res := reg.FindAllStringIndex(string(code), -1)
-// 	fmt.Printf("res %v\n", res)
-// 	originCode := make([]byte, len(code))
-// 	copy(originCode, code)
-// 	for _, v := range res {
-// 		f := originCode[v[0]:v[1]]
-// 		fmt.Printf("insertMutableCode %s\n", f)
-// 	}
-// 	return nil
-// }
 
 func BuildWasm(input string, output string) {
 	buildCFile("-g -O3", input, output)
