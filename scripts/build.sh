@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 TIME_BEGIN=$( date -u +%s )
 PWD="$(pwd)"
