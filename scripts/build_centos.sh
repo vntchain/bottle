@@ -24,7 +24,7 @@
      
      printf "\\tBuild llvm + clang\\n"
 
-	if [ ! -f $ROOT/build/lib/llvm/clang.tar.xz ]
+	if [ ! -d $ROOT/build/lib/llvm/clang ]
 	then
 		mkdir -p $ROOT/build/lib/llvm
 		wget  -O $ROOT/build/lib/llvm/clang.tar.xz $CLANG_URL
