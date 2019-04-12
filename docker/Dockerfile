@@ -1,6 +1,6 @@
 FROM ubuntu:xenial
 
-ENV PATH=/usr/lib/go-1.10/bin:$PATH
+ENV PATH=/usr/lib/go-1.10/bin:/root/go/bin:$PATH
 
 RUN \
     apt-get update && apt-get upgrade -q -y && \
