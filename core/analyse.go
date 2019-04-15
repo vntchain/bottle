@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the bottle library. If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package core
 
 import (
 	"fmt"
@@ -156,7 +156,7 @@ func (h *Hint) keyCheck() (HintMessages, error) {
 
 func (h *Hint) callCheck() (HintMessages, error) {
 	var msgs HintMessages
-	callReg := `(CALL)[^(;|\r|\n|\{|\})]*(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
+	callReg := `(CALL)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		call := fmt.Sprintf(callReg, escape(v.Name))
 		reg := regexp.MustCompile(call)
@@ -164,6 +164,8 @@ func (h *Hint) callCheck() (HintMessages, error) {
 		if len(stridx) != 0 {
 			//find call
 			left, right := removeSpaceAndParen(v.Info.Signature)
+			fmt.Printf("signature %s\n", v.Info.Signature)
+			fmt.Printf("left %v right %v\n", left, right)
 			if len(left) != 1 {
 				offset := stridx[0][0]
 				size := stridx[0][1] - stridx[0][0]
@@ -235,7 +237,7 @@ func (h *Hint) callCheck() (HintMessages, error) {
 //EVENT event_name(indexed[option] param_type param_name)
 func (h *Hint) eventCheck() (HintMessages, error) {
 	var msgs HintMessages
-	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
+	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		event := fmt.Sprintf(eventReg, escape(v.Name))
 		reg := regexp.MustCompile(event)
@@ -322,7 +324,7 @@ func (h *Hint) payableCheck() (HintMessages, error) {
 
 func (h *Hint) exportCheck() (HintMessages, error) {
 	var msgs HintMessages
-	exportReg := `[^(;|\r|\n|\{|\})]*(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
+	exportReg := `[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeNone {
 			//ignore

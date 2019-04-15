@@ -13,8 +13,21 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the bottle library. If not, see <http://www.gnu.org/licenses/>.
-package main
 
-// get wasmCeptionFlag and vntIncludeFlag from go install -ldflags "-X env.wasmCeptionFlag=xxx -X env.vntIncludeFlag=xxx"
-var wasmCeptionFlag string
-var vntIncludeFlag string
+package core
+
+type Location struct {
+	Path   string
+	Line   int
+	Offset int
+	Size   int
+}
+
+func NewLocation(path string, line int, offset int, size int) Location {
+	return Location{
+		Path:   path,
+		Line:   line,
+		Offset: offset,
+		Size:   size,
+	}
+}

@@ -21,17 +21,26 @@ import (
 	"os"
 	"sort"
 
+	"github.com/vntchain/bottle/core"
+
 	cli "gopkg.in/urfave/cli.v1"
 )
 
+// get wasmCeptionFlag and vntIncludeFlag from go install -ldflags "-X env.wasmCeptionFlag=xxx -X env.vntIncludeFlag=xxx"
+var wasmCeptionFlag string
+var vntIncludeFlag string
+var gitCommit string
+
 func main() {
+	app := core.NewApp(gitCommit, "the bottle command line interface", vntIncludeFlag, wasmCeptionFlag)
 	app.HideVersion = true // we have a command to print the version
 	app.Copyright = "Copyright 2018-2019 The bottle Authors"
 	app.Commands = []cli.Command{
-		compileCmd,
-		compressCmd,
-		decompressCmd,
-		hintCmd,
+		core.CompileCmd,
+		core.CompressCmd,
+		core.DecompressCmd,
+		core.HintCmd,
+		core.InitCmd,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 	if err := app.Run(os.Args); err != nil {
