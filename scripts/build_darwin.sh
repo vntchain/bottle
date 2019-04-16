@@ -1,4 +1,4 @@
-     CLANG_URL="http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-apple-darwin.tar.xz"
+    CLANG_URL="http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-apple-darwin.tar.xz"
 	WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-darwin-bin.tar.gz"
 	if ! XCODESELECT=$( command -v xcode-select)
 	then
@@ -8,7 +8,7 @@
 	fi
 
 	printf "\\tInstall libclang.\\n"
-	if [ ! -f $ROOT/build/lib/clang/clang.tar.xz ]
+	if [ ! -d $ROOT/build/lib/clang/clang ]
 	then
 		mkdir -p $ROOT/build/lib/clang
 		wget  -O $ROOT/build/lib/clang/clang.tar.xz $CLANG_URL

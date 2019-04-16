@@ -9,6 +9,9 @@ all: bottle
 
 bottle: 
 	scripts/env.sh  scripts/build.sh 
+	
+bottle-docker:
+	docker build -t bottle:0.6.0 ./docker
 
 clean:
 	rm -fr build/

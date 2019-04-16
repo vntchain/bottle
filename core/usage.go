@@ -16,7 +16,7 @@
 
 // Contains the gvnt command usage template and generator.
 
-package main
+package core
 
 import (
 	"io"

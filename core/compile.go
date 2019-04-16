@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the bottle library. If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package core
 
 import (
 	"fmt"
@@ -35,14 +35,14 @@ import (
 //	匹配任何空白字符，包括空格、制表符、换页符等等。等价于 [ \f\n\r\t\v]。注意 Unicode 正则表达式会匹配全角空格符。
 const (
 	//methodReg     = `(VNT_WASM_EXPORT\n)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_]+)(\s*)(\({1})([a-zA-Z0-9_\s,]*)(\){1})`
-	methodReg     = `(MUTABLE|UNMUTABLE\n)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_\$]+)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})([^{]*)({){1}`
+	methodReg     = `(MUTABLE|UNMUTABLE\n)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_\$\*]+)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})([^{]*)({){1}`
 	openParenReg  = `(\s*)(\()(\s*)`
 	closeParenReg = `(\s*)(\))(\s*)`
 	commaReg      = `(\s*),(\s*)`
 	spaceReg      = `(\s+)`
-	letterReg     = `[a-zA-Z0-9_\$]{1,}`
+	letterReg     = `[a-zA-Z0-9_\$\*]{1,}`
 
-	functionReg = `(mutable|unmutable|)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_\$]+)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})(\s*)({){1}`
+	functionReg = `(mutable|unmutable|)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_\$\*]+)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})(\s*)({){1}`
 	// constructorAndMethodReg = `(VNT_WASM_EXPORT\n)(\s*)(int(|32|64)|uint(|32|64|256)|address|string|bool|void|constructor)(\s+)([a-zA-Z0-9_]+)(\s*)(\({1})([a-zA-Z0-9_\s,]*)(\){1})([^{]*)({){1}`
 )
 
@@ -58,17 +58,17 @@ const (
 
 //event transfer_event(address _from,address _to,uint64 _amount);
 const (
-	eventReg = `(EVENT)(\s+)([a-zA-Z0-9_\$]+)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
+	eventReg = `(EVENT)(\s+)([a-zA-Z0-9_\$]+)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 )
 
 //call uint64 GetAmount(address _contractaddress,uint64 _amount, address _addr);
 const (
-	callReg = `(CALL)(\s+)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_\$]+)(\s*)(\({1})(\s*)(CallParams)(\s+)([a-zA-Z0-9_\$\s,]*)(\){1})`
+	callReg = `(CALL)(\s+)(int(|32|64)|uint(|32|64|256)|address|string|bool|void)(\s+)([a-zA-Z0-9_\$\*]+)(\s*)(\({1})(\s*)(CallParams)(\s+)([a-zA-Z0-9_\*\s,]*)(\){1})`
 )
 
 //construct token   (   uint64 totalsupply   ) {
 const (
-	constructorReg = `(constructor)(\s+)([a-zA-Z0-9_\$]+)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})([^{]*)({){1}`
+	constructorReg = `(constructor)(\s+)([a-zA-Z0-9_\$\*]+)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})([^{]*)({){1}`
 )
 
 const (
@@ -79,7 +79,7 @@ const (
 //event transfer_event(address _from,/*address _to,*/uint64 _amount);
 //todo 处理 //
 const (
-	commandReg = `/\*(.*)\*/|//(.*)`
+	commandReg = `/\*[\s\S]*\*/|//(.*)`
 )
 
 const (
@@ -157,9 +157,7 @@ func newAbiGen(code []byte) *abiGen {
 }
 
 func (gen *abiGen) removeComment() {
-	reg := regexp.MustCompile(commandReg)
-	res := reg.ReplaceAllString(string(gen.Code), "")
-	gen.Code = []byte(res)
+	gen.Code = removeComment(string(gen.Code))
 }
 
 //将显示声明的struct和typedef声明的struct替换成隐示声明
@@ -231,19 +229,34 @@ func removeSpaceAndParen(input string) ([]string, []string) {
 	str := re.ReplaceAllString(s, "(")
 
 	re = regexp.MustCompile(closeParenReg)
-	str = re.ReplaceAllString(str, ")")
+	str = re.ReplaceAllString(str, "")
 
 	re = regexp.MustCompile(spaceReg)
-	str = re.ReplaceAllString(str, " ")
+	str = re.ReplaceAllString(str, "")
 	sp := strings.Split(str, "(")
-	left := sp[0]
+	leftFinal := []string{sp[0]}
 	right := sp[1]
-
-	letterReg := `[a-zA-Z0-9_\$^*]{1,}`
-	re = regexp.MustCompile(letterReg)
-	leftFinal := re.FindAllString(left, -1)
-	rightFinal := re.FindAllString(right, -1)
+	var rightFinal []string
+	if right == "" {
+		rightFinal = []string{}
+	} else {
+		rightFinal = strings.Split(right, ",")
+	}
 	return leftFinal, rightFinal
+}
+
+func removeComment(code string) []byte {
+	codeBytes := []byte(code)
+	reg := regexp.MustCompile(commandReg)
+	idx := reg.FindAllStringIndex(code, -1)
+	for _, v := range idx {
+		for i := v[0]; i < v[1]; i++ {
+			if codeBytes[i] != byte('\n') {
+				codeBytes[i] = byte(' ')
+			}
+		}
+	}
+	return codeBytes
 }
 
 func (gen *abiGen) parseMethod() {

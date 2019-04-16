@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the bottle library. If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package core
 
 import (
 	"bytes"
@@ -34,6 +34,9 @@ import (
 	cli "gopkg.in/urfave/cli.v1"
 )
 
+var wasmCeptionFlag string
+var vntIncludeFlag string
+
 const (
 	VersionMajor = 0      // Major version component of the current release
 	VersionMinor = 6      // Minor version component of the current release
@@ -51,7 +54,7 @@ var Version = func() string {
 }()
 
 // NewApp creates an app with sane defaults.
-func NewApp(gitCommit, usage string) *cli.App {
+func NewApp(gitCommit, usage, includeFlag, wasmFlag string) *cli.App {
 	app := cli.NewApp()
 	app.Name = filepath.Base(os.Args[0])
 	app.Author = ""
@@ -62,12 +65,12 @@ func NewApp(gitCommit, usage string) *cli.App {
 		app.Version += "-" + gitCommit[:8]
 	}
 	app.Usage = usage
+	vntIncludeFlag = includeFlag
+	wasmCeptionFlag = wasmFlag
 	return app
 }
 
 var (
-	gitCommit string
-	app       = NewApp(gitCommit, "the bottle command line interface")
 	// flags that configure the node
 	contractCodeFlag = cli.StringFlag{
 		Name:  "code",
@@ -93,14 +96,14 @@ var (
 		Name:  "file",
 		Usage: "Specific a compress file path to decompress",
 	}
-	compileCmd = cli.Command{
+	CompileCmd = cli.Command{
 		Action:    compile,
 		Name:      "compile",
 		Usage:     "Compile contract code to wasm and compress",
 		ArgsUsage: "<code file>",
 		Category:  "COMPILE COMMANDS",
 		Description: `
-		wasmgen compile
+		bottle compile
 
 Compile contract code to wasm and compress
 		`,
@@ -110,14 +113,14 @@ Compile contract code to wasm and compress
 			includeFlag,
 		},
 	}
-	compressCmd = cli.Command{
+	CompressCmd = cli.Command{
 		Action:    compress,
 		Name:      "compress",
 		Usage:     "Compress wasm and abi",
 		ArgsUsage: "<code file> <abi file>",
 		Category:  "COMPRESS COMMANDS",
 		Description: `
-		wasmgen compress
+		bottle compress
 
 Compress wasm and abi
 		`,
@@ -127,14 +130,14 @@ Compress wasm and abi
 			outputFlag,
 		},
 	}
-	decompressCmd = cli.Command{
+	DecompressCmd = cli.Command{
 		Action:    decompress,
 		Name:      "decompress",
 		Usage:     "Deompress file into wasm and abi",
 		ArgsUsage: "<code file> <abi file>",
 		Category:  "DECOMPRESS COMMANDS",
 		Description: `
-		wasmgen decompress
+		bottle decompress
 
 Deompress file into wasm and abi
 		`,
@@ -143,14 +146,14 @@ Deompress file into wasm and abi
 			outputFlag,
 		},
 	}
-	hintCmd = cli.Command{
+	HintCmd = cli.Command{
 		Action:    hint,
 		Name:      "hint",
 		Usage:     "Contract hint",
 		ArgsUsage: "<code file> <abi file>",
 		Category:  "HINT COMMANDS",
 		Description: `
-		wasmgen hint
+		bottle hint
 
 Contract hint
 		`,
@@ -158,10 +161,39 @@ Contract hint
 			contractCodeFlag,
 		},
 	}
+	InitCmd = cli.Command{
+		Action:    initContract,
+		Name:      "init",
+		Usage:     "Initialize contract project",
+		ArgsUsage: "<project name> <directory path>",
+		Category:  "INIT COMMANDS",
+		Description: `
+		bottle init
+
+Contract init
+		`,
+	}
+	BuildCmd = cli.Command{
+		Action:    buildContract,
+		Name:      "build",
+		Usage:     "Build contract",
+		ArgsUsage: "<project name> <directory path>",
+		Category:  "BUILD COMMANDS",
+		Description: `
+		bottle build
+
+Contract build
+		`,
+	}
 )
 
 func compile(ctx *cli.Context) error {
 	start := time.Now()
+
+	if err := hint(ctx); err != nil {
+		return err
+	}
+
 	codePath = ctx.String(contractCodeFlag.Name)
 	includeDir = ctx.String(includeFlag.Name)
 	outputDir = ctx.String(outputFlag.Name)
@@ -379,7 +411,7 @@ func hint(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
+	code = removeComment(string(code))
 	cmdErr := cmd([]string{codePath})
 	if cmdErr != nil {
 		return cmdErr
@@ -426,5 +458,19 @@ func hint(ctx *cli.Context) error {
 		return err
 	}
 	msgs = append(msgs, msg...)
-	return cli.NewExitError(msgs.ToString(), -1)
+	if len(msgs) != 0 {
+		return cli.NewExitError(msgs.ToString(), -1)
+	} else {
+		return nil
+	}
+}
+
+func initContract(ctx *cli.Context) error {
+	fmt.Printf("init\n")
+	return nil
+}
+
+func buildContract(ctx *cli.Context) error {
+	fmt.Printf("build\n")
+	return nil
 }

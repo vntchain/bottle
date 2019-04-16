@@ -14,20 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the bottle library. If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package core
 
-type Location struct {
-	Path   string
-	Line   int
-	Offset int
-	Size   int
-}
-
-func NewLocation(path string, line int, offset int, size int) Location {
-	return Location{
-		Path:   path,
-		Line:   line,
-		Offset: offset,
-		Size:   size,
-	}
-}
+const (
+	KWMutable   = "MUTABLE"
+	KWUnmutable = "UNMUTABLE"
+	KWIndexed   = "indexed"
+	KWCall      = "CALL"
+	KWEvent     = "EVENT"
+)
