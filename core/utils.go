@@ -84,7 +84,6 @@ var astKeyRegFmt = `([ ]*)(KEY)([ ]+)(int(|32|64)|uint(|32|64|256)|address|strin
 const keyTypeReg = `(int(|32|64)|uint(|32|64|256)|address|string|bool|mapping|array|struct)`
 
 func isKey(input string, structnames string) bool {
-	// fmt.Printf("structnames %s\n", structnames)
 	keyReg := ""
 	if structnames == "" {
 		keyReg = astKeyReg
@@ -92,7 +91,6 @@ func isKey(input string, structnames string) bool {
 		keyReg = fmt.Sprintf(astKeyRegFmt, structnames)
 	}
 
-	// fmt.Printf("isKey %s astKeyReg %s\n", input, keyReg)
 	reg, err := regexp.Compile(keyReg)
 	flag := false
 	if err != nil {
@@ -159,6 +157,15 @@ func isSupportedType(tp string) bool {
 	return typesmap[tp]
 }
 
+func isSupportedKeyType(tp string) bool {
+	types := []string{"int32", "int64", "uint32", "uint64", "uint256", "string", "address", "bool", "_Bool", "struct", "mapping", "array"}
+	typesmap := map[string]bool{}
+	for _, v := range types {
+		typesmap[v] = true
+	}
+	return typesmap[tp]
+}
+
 func escape(input string) string {
 	if len(input) == 0 {
 		return input
@@ -166,7 +173,7 @@ func escape(input string) string {
 	if input[0:1] == "$" {
 		input = `\` + input
 	}
-	return input
+	return `[\*]?` + input
 }
 
 func deployText(abi, code string) string {

@@ -21,9 +21,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/vntchain/go-vnt/accounts/abi"
 )
 
-//key 类型检查，如果key写在其他方法之间，报错并提示  未完成，当前只判断key写在constructor之前，
+//key 类型检查<complete>，如果key写在其他方法之间，报错并提示  未完成，当前只判断key写在constructor之前，
 //没有constructor <complete>
 //多个constructor <complete>
 //call,第一个参数检查,参数类型检查及返回值检查,event,参数类型检查 <complete>
@@ -96,7 +98,6 @@ func (h *Hint) contructorCheck() (HintMessages, error) {
 	var msgs HintMessages
 	reg := regexp.MustCompile(constructorReg)
 	idx := reg.FindAllStringIndex(string(h.Code), -1)
-
 	if len(idx) == 0 {
 		offset := 0
 		size := 0
@@ -109,6 +110,7 @@ func (h *Hint) contructorCheck() (HintMessages, error) {
 		msgs = append(msgs, msg)
 		return msgs, nil
 	}
+
 	h.ConstructorPos = idx[0][0]
 	if len(idx) > 1 {
 		for i := 0; i < len(idx); i++ {
@@ -122,8 +124,53 @@ func (h *Hint) contructorCheck() (HintMessages, error) {
 			}
 			msgs = append(msgs, msg)
 		}
-
 		return msgs, nil
+	}
+
+	constructorReg := `(constructor)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
+	for _, v := range functionTree.Root {
+		call := fmt.Sprintf(constructorReg, escape(v.Name))
+		reg := regexp.MustCompile(call)
+		stridx := reg.FindAllStringIndex(string(h.Code), -1)
+		if len(stridx) != 0 {
+			//find
+			left, right := removeSpaceAndParen(v.Info.Signature)
+			offset := stridx[0][0]
+			size := stridx[0][1] - stridx[0][0]
+			line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
+			if len(left) != 1 {
+				msg := HintMessage{
+					Message:  "Constructor方法的返回值为不支持的类型：" + strings.Join(left, " "),
+					Type:     HintTypeError,
+					Location: NewLocation(h.Path, line, lineOffset, size),
+				}
+				msgs = append(msgs, msg)
+			} else {
+				if !isSupportedType(left[0]) {
+					msg := HintMessage{
+						Message:  "Constructor方法的返回值为不支持的类型：" + left[0],
+						Type:     HintTypeError,
+						Location: NewLocation(h.Path, line, lineOffset, size),
+					}
+					msgs = append(msgs, msg)
+				}
+			}
+			var msgStr = "Constructor方法的参数为不支持的类型："
+			types := []string{}
+			for i := 0; i < len(right); i++ {
+				if !isSupportedType(right[i]) {
+					types = append(types, right[i])
+				}
+			}
+			if len(types) != 0 {
+				msg := HintMessage{
+					Message:  msgStr + strings.Join(types, " ,"),
+					Type:     HintTypeError,
+					Location: NewLocation(h.Path, line, lineOffset, size),
+				}
+				msgs = append(msgs, msg)
+			}
+		}
 	}
 
 	return msgs, nil
@@ -137,9 +184,9 @@ func (h *Hint) keyCheck() (HintMessages, error) {
 		if err != nil {
 			return nil, err
 		}
+		size := len(v.FieldName)
+		line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 		if offset >= h.ConstructorPos {
-			size := len(v.FieldName)
-			line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 			msg := HintMessage{
 				Message:  "KEY必须定义在construct之前",
 				Type:     HintTypeWarning,
@@ -147,29 +194,54 @@ func (h *Hint) keyCheck() (HintMessages, error) {
 			}
 			msgs = append(msgs, msg)
 		}
+		// 类型判断
+		// key类型分基本类型和复杂类型，
+		// 基本类型包括int32/64,uint32/64,uint256,bool,string,address
+		// 复杂类型包括mapping,array,由基本类型构成的struct
+		types := Traversal(v)
+		unsupported := []string{}
+		for _, t := range types {
+			if !isSupportedKeyType(t) {
+				unsupported = append(unsupported, t)
+			}
+		}
+		if len(unsupported) != 0 {
+			msg := HintMessage{
+				Message:  "KEY为不支持的类型：" + strings.Join(unsupported, " ,"),
+				Type:     HintTypeError,
+				Location: NewLocation(h.Path, line, lineOffset, size),
+			}
+			msgs = append(msgs, msg)
+		}
 	}
-	if len(msgs) != 0 {
-		return msgs, nil
-	}
+
 	return msgs, nil
+}
+
+func Traversal(node *abi.Node) []string {
+	types := []string{node.FieldType}
+	if len(node.Tables) != 0 {
+		for _, v := range node.Tables {
+			types = append(types, Traversal(v)...)
+		}
+	}
+	return types
 }
 
 func (h *Hint) callCheck() (HintMessages, error) {
 	var msgs HintMessages
-	callReg := `(CALL)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
+	callReg := `(CALL)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		call := fmt.Sprintf(callReg, escape(v.Name))
 		reg := regexp.MustCompile(call)
 		stridx := reg.FindAllStringIndex(string(h.Code), -1)
 		if len(stridx) != 0 {
+			offset := stridx[0][0]
+			size := stridx[0][1] - stridx[0][0]
+			line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 			//find call
 			left, right := removeSpaceAndParen(v.Info.Signature)
-			fmt.Printf("signature %s\n", v.Info.Signature)
-			fmt.Printf("left %v right %v\n", left, right)
 			if len(left) != 1 {
-				offset := stridx[0][0]
-				size := stridx[0][1] - stridx[0][0]
-				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "CALL方法的返回值为不支持的类型：" + strings.Join(left, " "),
 					Type:     HintTypeError,
@@ -178,9 +250,6 @@ func (h *Hint) callCheck() (HintMessages, error) {
 				msgs = append(msgs, msg)
 			} else {
 				if !isSupportedType(left[0]) {
-					offset := stridx[0][0]
-					size := stridx[0][1] - stridx[0][0]
-					line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 					msg := HintMessage{
 						Message:  "CALL方法的返回值为不支持的类型：" + left[0],
 						Type:     HintTypeError,
@@ -190,9 +259,6 @@ func (h *Hint) callCheck() (HintMessages, error) {
 				}
 			}
 			if len(right) == 0 {
-				offset := stridx[0][0]
-				size := stridx[0][1] - stridx[0][0]
-				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "CALL方法至少需要一个类型为CallParams的参数",
 					Type:     HintTypeError,
@@ -200,12 +266,10 @@ func (h *Hint) callCheck() (HintMessages, error) {
 				}
 				msgs = append(msgs, msg)
 			} else {
+				types := []string{}
 				for i := 0; i < len(right); i++ {
 					if i == 0 { //callprams
 						if right[i] != "CallParams" {
-							offset := stridx[0][0]
-							size := stridx[0][1] - stridx[0][0]
-							line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 							msg := HintMessage{
 								Message:  "CALL方法的第一个参数为不支持的类型：" + right[i] + ", 支持的类型为CallParams",
 								Type:     HintTypeError,
@@ -215,17 +279,17 @@ func (h *Hint) callCheck() (HintMessages, error) {
 						}
 					} else { //input type
 						if !isSupportedType(right[i]) {
-							offset := stridx[0][0]
-							size := stridx[0][1] - stridx[0][0]
-							line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
-							msg := HintMessage{
-								Message:  "CALL方法的参数为不支持的类型：" + right[i],
-								Type:     HintTypeError,
-								Location: NewLocation(h.Path, line, lineOffset, size),
-							}
-							msgs = append(msgs, msg)
+							types = append(types, right[i])
 						}
 					}
+				}
+				if len(types) != 0 {
+					msg := HintMessage{
+						Message:  "CALL方法的参数为不支持的类型：" + strings.Join(types, " ,"),
+						Type:     HintTypeError,
+						Location: NewLocation(h.Path, line, lineOffset, size),
+					}
+					msgs = append(msgs, msg)
 				}
 			}
 		}
@@ -237,18 +301,36 @@ func (h *Hint) callCheck() (HintMessages, error) {
 //EVENT event_name(indexed[option] param_type param_name)
 func (h *Hint) eventCheck() (HintMessages, error) {
 	var msgs HintMessages
-	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
+	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		event := fmt.Sprintf(eventReg, escape(v.Name))
 		reg := regexp.MustCompile(event)
 		stridx := reg.FindAllStringIndex(string(h.Code), -1)
 		if len(stridx) != 0 {
+			offset := stridx[0][0]
+			size := stridx[0][1] - stridx[0][0]
+			line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 			//find event
-			_, right := removeSpaceAndParen(v.Info.Signature)
+			left, right := removeSpaceAndParen(v.Info.Signature)
+
+			if len(left) != 1 {
+				msg := HintMessage{
+					Message:  "EVENT方法的返回值为不支持的类型：" + strings.Join(left, " "),
+					Type:     HintTypeError,
+					Location: NewLocation(h.Path, line, lineOffset, size),
+				}
+				msgs = append(msgs, msg)
+			} else {
+				if !isSupportedType(left[0]) {
+					msg := HintMessage{
+						Message:  "EVENT方法的返回值为不支持的类型：" + left[0],
+						Type:     HintTypeError,
+						Location: NewLocation(h.Path, line, lineOffset, size),
+					}
+					msgs = append(msgs, msg)
+				}
+			}
 			if len(right) == 0 {
-				offset := stridx[0][0]
-				size := stridx[0][1] - stridx[0][0]
-				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "EVENT方法至少需要一个参数",
 					Type:     HintTypeError,
@@ -257,21 +339,22 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 				msgs = append(msgs, msg)
 			} else {
 				//类型判断
-				//indexed位置
+				types := []string{}
 				for i := 0; i < len(right); i++ {
 					if !isSupportedType(right[i]) {
-						offset := stridx[0][0]
-						size := stridx[0][1] - stridx[0][0]
-						line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
-						msg := HintMessage{
-							Message:  "EVENT方法的参数为不支持的类型：" + right[i],
-							Type:     HintTypeError,
-							Location: NewLocation(h.Path, line, lineOffset, size),
-						}
-						msgs = append(msgs, msg)
-						continue
+						types = append(types, right[i])
+
 					}
 				}
+				if len(types) != 0 {
+					msg := HintMessage{
+						Message:  "EVENT方法的参数为不支持的类型：" + strings.Join(types, " ,"),
+						Type:     HintTypeError,
+						Location: NewLocation(h.Path, line, lineOffset, size),
+					}
+					msgs = append(msgs, msg)
+				}
+				//indexed位置
 				sym := splitArgs(string(h.Code[stridx[0][0]:stridx[0][1]]))
 				sym = sym[1:]
 				for i := 0; i < len(sym); i++ {
@@ -281,9 +364,6 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 						irregular = false
 					}
 					if irregular {
-						offset := stridx[0][0]
-						size := stridx[0][1] - stridx[0][0]
-						line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 						msg := HintMessage{
 							Message:  "EVENT方法中的indexed写法不规范",
 							Type:     HintTypeError,
@@ -293,9 +373,7 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 					}
 				}
 			}
-
 		}
-
 	}
 	return msgs, nil
 }
@@ -313,7 +391,7 @@ func (h *Hint) payableCheck() (HintMessages, error) {
 				msg := HintMessage{
 					Message:  "Payable方法必须使用关键字MUTABLE进行导出",
 					Type:     HintTypeError,
-					Location: v.Info.Location,
+					Location: NewLocation(v.Info.Location.Path, v.Info.Location.Line+1, 0, v.Info.Location.Size),
 				}
 				msgs = append(msgs, msg)
 			}
@@ -324,7 +402,7 @@ func (h *Hint) payableCheck() (HintMessages, error) {
 
 func (h *Hint) exportCheck() (HintMessages, error) {
 	var msgs HintMessages
-	exportReg := `[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\$\s,]*)(\){1})`
+	exportReg := `[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeNone {
 			//ignore
@@ -335,11 +413,11 @@ func (h *Hint) exportCheck() (HintMessages, error) {
 		stridx := reg.FindAllStringIndex(string(h.Code), -1)
 		if len(stridx) != 0 {
 			//find method
+			offset := stridx[0][0]
+			size := stridx[0][1] - stridx[0][0]
+			line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 			left, right := removeSpaceAndParen(v.Info.Signature)
 			if len(left) != 1 {
-				offset := stridx[0][0]
-				size := stridx[0][1] - stridx[0][0]
-				line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 				msg := HintMessage{
 					Message:  "方法的返回值为不支持的类型：" + strings.Join(left, " "),
 					Type:     HintTypeError,
@@ -348,9 +426,6 @@ func (h *Hint) exportCheck() (HintMessages, error) {
 				msgs = append(msgs, msg)
 			} else {
 				if !isSupportedType(left[0]) {
-					offset := stridx[0][0]
-					size := stridx[0][1] - stridx[0][0]
-					line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
 					msg := HintMessage{
 						Message:  "方法的返回值为不支持的类型：" + left[0],
 						Type:     HintTypeError,
@@ -359,18 +434,19 @@ func (h *Hint) exportCheck() (HintMessages, error) {
 					msgs = append(msgs, msg)
 				}
 			}
+			types := []string{}
 			for i := 0; i < len(right); i++ {
 				if !isSupportedType(right[i]) {
-					offset := stridx[0][0]
-					size := stridx[0][1] - stridx[0][0]
-					line, lineOffset := GetLineNumber(offset, fileContent[h.Path])
-					msg := HintMessage{
-						Message:  "方法的参数为不支持的类型：" + right[i],
-						Type:     HintTypeError,
-						Location: NewLocation(h.Path, line, lineOffset, size),
-					}
-					msgs = append(msgs, msg)
+					types = append(types, right[i])
 				}
+			}
+			if len(types) != 0 {
+				msg := HintMessage{
+					Message:  "方法的参数为不支持的类型：" + strings.Join(types, " ,"),
+					Type:     HintTypeError,
+					Location: NewLocation(h.Path, line, lineOffset, size),
+				}
+				msgs = append(msgs, msg)
 			}
 		}
 	}
@@ -404,4 +480,8 @@ func (h *Hint) checkUnmutableFunction() (HintMessages, error) {
 		}
 	}
 	return msgs, nil
+}
+
+func (h *Hint) typeCheck() {
+
 }

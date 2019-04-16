@@ -189,6 +189,11 @@ Contract build
 
 func compile(ctx *cli.Context) error {
 	start := time.Now()
+
+	if err := hint(ctx); err != nil {
+		return err
+	}
+
 	codePath = ctx.String(contractCodeFlag.Name)
 	includeDir = ctx.String(includeFlag.Name)
 	outputDir = ctx.String(outputFlag.Name)
@@ -406,7 +411,7 @@ func hint(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
+	code = removeComment(string(code))
 	cmdErr := cmd([]string{codePath})
 	if cmdErr != nil {
 		return cmdErr
@@ -453,7 +458,11 @@ func hint(ctx *cli.Context) error {
 		return err
 	}
 	msgs = append(msgs, msg...)
-	return cli.NewExitError(msgs.ToString(), -1)
+	if len(msgs) != 0 {
+		return cli.NewExitError(msgs.ToString(), -1)
+	} else {
+		return nil
+	}
 }
 
 func initContract(ctx *cli.Context) error {

@@ -1,0 +1,1 @@
+[{"name":"test","constant":false,"inputs":[{"name":"a","type":"string","indexed":false}],"outputs":[],"type":"constructor"}]
