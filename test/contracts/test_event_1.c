@@ -2,6 +2,4 @@
 
 EVENT event_test();
 
-constructor test()
-{
-}
+constructor test() {}

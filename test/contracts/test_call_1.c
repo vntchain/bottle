@@ -2,6 +2,4 @@
 
 CALL int32 call_test();
 
-constructor test()
-{
-}
+constructor test() {}

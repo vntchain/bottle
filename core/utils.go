@@ -72,6 +72,8 @@ func GetLineNumber(offset int, filecontent []ContentPerLine) (int, int) {
 	for i := 1; i < len(filecontent); i++ {
 		if offset >= filecontent[i-1].Offset && offset < filecontent[i].Offset {
 			return i, offset - filecontent[i-1].Offset + 1
+		} else if i == len(filecontent)-1 && offset >= filecontent[i].Offset {
+			return i + 1, offset - filecontent[i].Offset + 1
 		}
 	}
 	return 1, 1
