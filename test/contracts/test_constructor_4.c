@@ -1,5 +1,3 @@
 #include "vntlib.h"
 
-constructor *test()
-{
-}
+constructor *test() {}

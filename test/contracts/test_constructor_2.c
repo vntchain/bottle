@@ -1,10 +1,6 @@
 #include "vntlib.h"
 
-//no constructor
+// no constructor
 
-constructor test1()
-{
-}
-constructor test2()
-{
-}
+constructor test1() {}
+constructor test2() {}

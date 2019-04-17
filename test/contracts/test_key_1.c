@@ -1,6 +1,5 @@
 #include "vntlib.h"
 
-
 KEY int32 a1;
 KEY int64 a2;
 KEY uint64 a3;
@@ -12,6 +11,4 @@ KEY bool a8;
 
 KEY int32 *b;
 
-constructor test()
-{
-}
+constructor test() {}

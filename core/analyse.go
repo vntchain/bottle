@@ -391,7 +391,7 @@ func (h *Hint) payableCheck() (HintMessages, error) {
 				msg := HintMessage{
 					Message:  "Payable方法必须使用关键字MUTABLE进行导出",
 					Type:     HintTypeError,
-					Location: NewLocation(v.Info.Location.Path, v.Info.Location.Line+1, 0, v.Info.Location.Size),
+					Location: NewLocation(v.Info.Location.Path, v.Info.Location.Line+1, 1, v.Info.Location.Size),
 				}
 				msgs = append(msgs, msg)
 			}

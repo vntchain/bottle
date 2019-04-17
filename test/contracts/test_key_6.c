@@ -9,11 +9,6 @@ KEY string a6;
 KEY address a7;
 KEY bool a8;
 
-constructor test()
-{
-}
-
+constructor test() {}
 
 KEY int32 *b;
-
-
