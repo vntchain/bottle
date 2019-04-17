@@ -11,7 +11,7 @@ bottle:
 	scripts/env.sh  scripts/build.sh 
 	
 bottle-docker:
-	docker build -t bottle:0.6.0 ./docker
+	docker build -t bottle:0.6.0 ./docker/ubuntu
 
 clean:
 	rm -fr build/

@@ -79,7 +79,7 @@ const (
 //event transfer_event(address _from,/*address _to,*/uint64 _amount);
 //todo 处理 //
 const (
-	commandReg = `/\*[\s\S]*\*/|//(.*)`
+	commandReg = `/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/|//(.*)`
 )
 
 const (

@@ -133,6 +133,29 @@ d*/aa
 				byte(32), byte(32), byte(32), byte('a'), byte('a'), byte(10),
 			},
 		},
+		{
+			code: []byte(`
+/**a
+a
+*/
+aa
+/**a
+a
+*/
+bb
+`),
+			wanted: []byte{
+				byte(10),
+				byte(32), byte(32), byte(32), byte(32), byte(10),
+				byte(32), byte(10),
+				byte(32), byte(32), byte(10),
+				byte('a'), byte('a'), byte(10),
+				byte(32), byte(32), byte(32), byte(32), byte(10),
+				byte(32), byte(10),
+				byte(32), byte(32), byte(10),
+				byte('b'), byte('b'), byte(10),
+			},
+		},
 	}
 
 	for _, v := range tests {

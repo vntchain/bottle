@@ -55,7 +55,23 @@ make bottle
 ```
 ./build/bin/bottle
 ```
+## 使用docker运行
 
+### 编译得到docker镜像
+
+将``bottle``代码clone到选择的目录
+
+```
+git clone https://github.com/vntchain/bottle
+```
+
+
+然后使用以下命令编译得到镜像
+
+```
+cd bottle
+make bottle-docker
+```
 
 ## 使用
 
@@ -64,12 +80,25 @@ make bottle
 ```
 bottle compile -code <your contract path> -output <the path of your choosing to save the compiled contract file>
 ```
+
+docker命令
+
+```
+docker run --rm -v <your contract directory>:/tmp bottle:0.6.0 compile -code /tmp/<your contract file name> 
+```
+
 通过以上命令可以获得后缀名为``compress``的编译文件和后缀名为``abi``的abi文件，使用compress文件可以部署智能合约到``VNT``网络，通过abi文件可以访问``VNT``网络中的智能合约
 
 ### 智能合约代码纠错及提示
 
 ```
 bottle hint -code <your contract path>
+```
+
+docker命令
+
+```
+docker run --rm -v <your contract directory>:/tmp bottle:0.6.0  hint -code /tmp/<your contract file name> 
 ```
 
 ### Bottle命令
