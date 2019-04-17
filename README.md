@@ -55,6 +55,11 @@ make bottle
 ```
 ./build/bin/bottle
 ```
+
+### 其他系统
+
+目前``bottle``暂不支持除上述系统之外的系统，如果希望在不支持的系统上运行bottle，请使用``docker``的方式
+
 ## 使用docker运行
 
 ### 编译得到docker镜像
@@ -77,11 +82,13 @@ make bottle-docker
 
 ### 编译智能合约代码
 
+通过编译得到``bottle``
+
 ```
 bottle compile -code <your contract path> -output <the path of your choosing to save the compiled contract file>
 ```
 
-docker命令
+使用``docker``运行
 
 ```
 docker run --rm -v <your contract directory>:/tmp bottle:0.6.0 compile -code /tmp/<your contract file name> 
@@ -91,11 +98,13 @@ docker run --rm -v <your contract directory>:/tmp bottle:0.6.0 compile -code /tm
 
 ### 智能合约代码纠错及提示
 
+通过编译得到``bottle``
+
 ```
 bottle hint -code <your contract path>
 ```
 
-docker命令
+使用``docker``运行
 
 ```
 docker run --rm -v <your contract directory>:/tmp bottle:0.6.0  hint -code /tmp/<your contract file name> 
