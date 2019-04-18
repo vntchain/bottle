@@ -2,6 +2,8 @@ FROM ubuntu:xenial
 
 ENV PATH=/usr/lib/go-1.10/bin:/root/go/bin:$PATH
 
+ENV GOPATH=/root/go
+
 RUN \
     apt-get update && apt-get upgrade -q -y && \
     apt-get install -y --no-install-recommends libxml2-dev golang-1.10 xz-utils git make gcc wget libc-dev ca-certificates && \
