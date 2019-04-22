@@ -165,7 +165,7 @@ func TestBottle(t *testing.T) {
 		}
 		errStr := strings.Join(errs, ",")
 		if errStr != v.wanted {
-			t.Fatalf("test result mismatch, got %s, want %s", errStr, v.wanted)
+			t.Fatalf("test [%s] result mismatch, got %s, want %s", v.contract, errStr, v.wanted)
 		}
 	}
 

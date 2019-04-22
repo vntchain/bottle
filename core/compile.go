@@ -126,6 +126,12 @@ type Argument struct {
 
 type Arguments []Argument
 
+type Contract struct {
+	ContractName string `json:"contractName"`
+	Abi          string `json:"abi"`
+	Bytecode     string `json:"bytecode"`
+}
+
 type abiGen struct {
 	Code []byte
 	abi  ABI

@@ -240,6 +240,7 @@ func compile(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	abijson := string(res)
 	abires, err := abi.JSON(bytes.NewBuffer(res))
 	if err != nil {
 		return err
@@ -272,13 +273,28 @@ func compile(ctx *cli.Context) error {
 		return err
 	}
 	hexPath := path.Join(outputDir, abires.Constructor.Name+".hex")
-	hexString := hex.EncodeToString(cpsRes)
-	err = writeFile(hexPath, []byte("0x"+hexString))
+	hexString := "0x" + hex.EncodeToString(cpsRes)
+	err = writeFile(hexPath, []byte(hexString))
 	if err != nil {
 		return err
 	}
 	deployCodePath := path.Join(outputDir, abires.Constructor.Name+".js")
-	err = writeFile(deployCodePath, []byte(deployText(string(res), "0x"+hexString)))
+	err = writeFile(deployCodePath, []byte(deployText(string(res), hexString)))
+	if err != nil {
+		return err
+	}
+
+	contractJsonPath := path.Join(outputDir, abires.Constructor.Name+".json")
+	contract := Contract{
+		ContractName: abires.Constructor.Name,
+		Abi:          abijson,
+		Bytecode:     hexString,
+	}
+	contractJson, err := json.Marshal(contract)
+	if err != nil {
+		return err
+	}
+	err = writeFile(contractJsonPath, contractJson)
 	if err != nil {
 		return err
 	}
@@ -298,6 +314,7 @@ func compile(ctx *cli.Context) error {
 	li.Printf("Compress Data path: %s\n", cpsPath)
 	li.Printf("Compress Hex Data path: %s\n", hexPath)
 	li.Printf("Deploy JS path: %s\n", deployCodePath)
+	li.Printf("Contract JSON path: %s\n", contractJsonPath)
 	li = output.Prefix(">>>").Cyan()
 	li.Printf("Please use %s when you want to create a contract\n", abires.Constructor.Name+".compress")
 	return nil
