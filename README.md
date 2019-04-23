@@ -80,7 +80,7 @@ make bottle-docker
 
 ### 通过dockerhub得到镜像
 
-镜像拉取命名
+镜像拉取命令
 
 ```
 docker pull vntchain/bottle:0.6.0
