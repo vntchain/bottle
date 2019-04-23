@@ -78,6 +78,14 @@ cd bottle
 make bottle-docker
 ```
 
+### 通过dockerhub得到镜像
+
+镜像拉取命名
+
+```
+docker pull vntchain/bottle:0.6.0
+```
+
 ## 使用
 
 ### 编译智能合约代码
