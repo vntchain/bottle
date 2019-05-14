@@ -118,11 +118,49 @@ docker run --rm -v <your contract directory>:/tmp bottle:0.6.0  hint -code /tmp/
 ### 合约创建与部署
 
 通过以下命令在空文件夹中创建智能合约与部署配置
+
 ```
 bottle init
 ```
 
-创建完成后可以通过``bottle build``,``bottle migrate``来编译智能合约并将他们部署到VNTChain.
+生成的文件结构
+
+```
+|____migrations
+| |____1_initial_migration.js
+|____contracts
+| |____Migrations.c
+| |____vntlib.h
+| |____Erc20.c
+|____bottle.js
+```
+
+创建完成后可以通过``bottle build``,``bottle migrate``来编译智能合约并将他们部署到``VNTChain``网络.
+
+#### Build命令
+
+``bottle build``命令需要在``bottle.js``所在的目录下执行，会把``contracts``文件夹下的智能合约文件进行编译并输出到``build/contracts``文件夹下
+
+#### Migrate命令
+
+``bottle migrate``命令需要在``bottle.js``所在的目录下执行，用于执行``migrations``文件夹下的``js``文件，``js``文件用于将``contracts``文件夹下的智能合约部署到``VNTChain``网络
+
+#### Migrate文件
+
+``migrate``文件是位于``migrations``文件夹下的``js``文件，一个简单的``migrate``文件如下所示
+
+文件名: 4_example_migration.js
+
+```js
+var MyContract = artifacts.require("./contracts/MyContract.c");
+
+module.exports = function(deployer) {
+  // deployment steps
+  deployer.deploy(MyContract);
+};
+```
+
+``migrate``文件名必须以数字为前缀，后缀为描述。数字前缀用于按顺序执行``migrate``文件，以及记录文件是否已被执行。后缀用于描述``migrate``文件，方便识别和理解文件的作用。
 
 
 

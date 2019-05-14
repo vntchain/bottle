@@ -378,7 +378,7 @@ func compileWith(ctx *cli.Context, _codePath, _includeDir, _outputDir string) er
 		}
 	}
 
-	output := line.New(os.Stdout, "", "", line.WhiteColor)
+	output := line.New(os.Stdout, "", "", nil)
 	PrintfHeader(output, "Compile contract: "+abires.Constructor.Name+"\n")
 	PrintfHeader(output, "Input file\n")
 	PrintfBody(output, "Contract path:", codePath)
@@ -466,7 +466,7 @@ func compress(ctx *cli.Context) error {
 		return err
 	}
 
-	output := line.New(os.Stdout, "", "", line.WhiteColor)
+	output := line.New(os.Stdout, "", "", nil)
 	PrintfHeader(output, "Compress finished. %s\n", time.Since(start).String())
 	PrintfBody(output, "Wasm path:", wasmPath)
 	PrintfBody(output, "Abi path:", abiPath)
@@ -515,7 +515,7 @@ func decompress(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	output := line.New(os.Stdout, "", "", line.WhiteColor)
+	output := line.New(os.Stdout, "", "", nil)
 	PrintfHeader(output, "Decompress finished. %s\n", time.Since(start).String())
 	PrintfHeader(output, "Input file\n")
 	PrintfBody(output, "Compress file path:", compressPath)

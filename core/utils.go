@@ -174,12 +174,15 @@ func unpackZip(dst string, src string, depth int) error {
 			return err
 		}
 		defer rc.Close()
-		var content []byte
-		_, err = io.ReadFull(rc, content)
+		if err := writeFile(filename, nil); err != nil {
+			return err
+		}
+		f, err := os.OpenFile(filename, os.O_RDWR, os.ModePerm)
 		if err != nil {
 			return err
 		}
-		err = writeFile(filename, content)
+		defer f.Close()
+		_, err = io.Copy(f, rc)
 		if err != nil {
 			return err
 		}
@@ -242,13 +245,13 @@ func deployText(abi, code string) string {
 }
 
 func PrintfHeader(output *line.Line, format string, a ...interface{}) {
-	li := output.Prefix("").White()
+	li := output.Prefix("")
 	li.Printf(format, a...)
 	li.Printf("%s\n", strings.Repeat("=", len(fmt.Sprintf(format, a...))))
 }
 
 func PrintfBody(output *line.Line, before string, after string) {
-	li := output.Prefix("   > ").White()
+	li := output.Prefix("   > ")
 	pad := rightPadBytes([]byte(before), 25)
 	text := fmt.Sprintf("%s%s\n", string(pad), after)
 	li.Printf("%s", text)
