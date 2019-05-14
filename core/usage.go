@@ -89,7 +89,6 @@ var AppHelpFlagGroups = []flagGroup{
 			fromFlag,
 			toFlag,
 			networkFlag,
-			compileAllFlag,
 			verboseRpcFlag,
 		},
 	},

@@ -119,10 +119,6 @@ var (
 		Name:  "network",
 		Usage: "Specify the network to use, saving artifacts specific to that network. Network name must exist in the configuration",
 	}
-	compileAllFlag = cli.BoolFlag{
-		Name:  "compile-all",
-		Usage: "Compile all contracts instead of intelligently choosing which contracts need to be compiled",
-	}
 	verboseRpcFlag = cli.BoolFlag{
 		Name:  "verbose-rpc",
 		Usage: "Log communication between bottle and the VNTChain client",
@@ -202,12 +198,12 @@ Initialize dapp project
 	BuildCmd = cli.Command{
 		Action:   buildContract,
 		Name:     "build",
-		Usage:    "Build contract",
+		Usage:    "Build contracts",
 		Category: "BUILD COMMANDS",
 		Description: `
-		bottle build
+bottle build
 
-Contract build
+Build contracts in dapp directory
 		`,
 	}
 	MigrateCmd = cli.Command{
@@ -216,16 +212,15 @@ Contract build
 		Usage:    "Run migrations to deploy contracts",
 		Category: "MIGRATE COMMANDS",
 		Description: `
-		bottle migrate
+bottle migrate [-reset] [-f <from_number>] [-t <to_number>] [-network <network>] [verbose-rpc]
 
-Contract migrate
+Run migrations to deploy contracts
 		`,
 		Flags: []cli.Flag{
 			resetFlag,
 			fromFlag,
 			toFlag,
 			networkFlag,
-			compileAllFlag,
 			verboseRpcFlag,
 		},
 	}
@@ -235,18 +230,11 @@ Contract migrate
 		Usage:    "Run rpc and ipc server",
 		Category: "SERVER COMMANDS",
 		Description: `
-		bottle server
+bottle server
 
 Contract server
 		`,
-		Flags: []cli.Flag{
-			resetFlag,
-			fromFlag,
-			toFlag,
-			networkFlag,
-			compileAllFlag,
-			verboseRpcFlag,
-		},
+		Flags: []cli.Flag{},
 	}
 )
 

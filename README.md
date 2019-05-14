@@ -115,6 +115,17 @@ bottle hint -code <your contract path>
 docker run --rm -v <your contract directory>:/tmp bottle:0.6.0  hint -code /tmp/<your contract file name> 
 ```
 
+### 合约创建与部署
+
+通过以下命令在空文件夹中创建智能合约与部署配置
+```
+bottle init
+```
+
+创建完成后可以通过``bottle build``,``bottle migrate``来编译智能合约并将他们部署到VNTChain.
+
+
+
 ### Bottle命令
 ```
 NAME:
@@ -123,34 +134,35 @@ NAME:
    Copyright 2018-2019 The bottle Authors
 
 USAGE:
-   bottle [global options] command [command options] [arguments...]
+   bottle [global options] command [command options] [arguments11...]
    
 VERSION:
-   0.6.0-beta
+   0.6.0-beta-1e52fa2f
    
 COMMANDS:
-   compile     Compile contract code to wasm and compress
-   compress    Compress wasm and abi
-   decompress  Deompress file into wasm and abi
+   build       Build contracts
+   compile     Compile contract source file
+   compress    Compress wasm and abi file
+   decompress  Deompress file into wasm and abi file
    hint        Contract hint
+   init        Initialize dapp project
+   migrate     Run migrations to deploy contracts
    help, h     Shows a list of commands or help for one command
    
-COMPILE OPTIONS:
+PATH OPTIONS:
   --code value  Specific a contract code path
   --include     Specific the head file directory need by contract
   --output      Specific a output directory path
-  
-COMPRESS OPTIONS:
-  --wasm value  Specific a wasm path
-  --abi value   Specific a abi path need by contract
-  --output      Specific a output directory path
-  
-DECOMPRESS OPTIONS:
   --file value  Specific a compress file path to decompress
-  --output      Specific a output directory path
+  --abi value   Specific a abi path needed by contract
+  --wasm value  Specific a wasm path
   
-HINT OPTIONS:
-  --code value  Specific a contract code path
+MIGRATE OPTIONS:
+  --reset          Run all migrations from the beginning, instead of running from the last completed migration
+  -f value         Run contracts from a specific migration. The number refers to the prefix of the migration file (default: 0)
+  -t value         Run contracts to a specific migration. The number refers to the prefix of the migration file (default: 0)
+  --network value  Specify the network to use, saving artifacts specific to that network. Network name must exist in the configuration
+  --verbose-rpc    Log communication between bottle and the VNTChain client
   
 GLOBAL OPTIONS:
   --help, -h  show help

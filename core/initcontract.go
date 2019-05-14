@@ -12,7 +12,6 @@ import (
 )
 
 var (
-	tempPath     = path.Join("/Users/weisaizhang/Documents/go/src/github.com/vntchain/bottle/template")
 	tempFileName = "bottle-contract-template-master"
 	tempUrl      = "https://github.com/ooozws/bottle-contract-template/archive/master.zip"
 )
