@@ -1,5 +1,6 @@
-    CLANG_URL="http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-apple-darwin.tar.xz"
+	CLANG_URL="http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-apple-darwin.tar.xz"
 	WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-darwin-bin.tar.gz"
+	NODE_URL="https://nodejs.org/download/release/latest-v10.x/node-v10.15.3-darwin-x64.tar.xz"
 	if ! XCODESELECT=$( command -v xcode-select)
 	then
 		printf "\\n\\tXCode must be installed in order to proceed.\\n\\n"
@@ -18,6 +19,19 @@
 		rm clang.tar.xz
 	fi
 	printf "\\tInstall libclang successfully.\\n"
+
+	printf "\\tInstall nodejs.\\n"
+	if [ ! -d $ROOT/build/lib/node/node ]
+	then
+		mkdir -p $ROOT/build/lib/node
+		wget  -O $ROOT/build/lib/node/node.tar.xz $NODE_URL
+		cd  $ROOT/build/lib/node
+		mkdir -p node
+		tar -xf node.tar.xz --strip-components 1 -C ./node
+		rm node.tar.xz
+	fi
+	printf "\\tInstall nodejs successfully.\\n"
+
 
 
 	

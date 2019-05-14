@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"path"
 	"regexp"
@@ -25,6 +26,9 @@ import (
 
 	"github.com/vntchain/go-vnt/accounts/abi"
 	"github.com/vntchain/go-vnt/common"
+	"github.com/vntchain/go-vnt/core/wavm"
+	"github.com/vntchain/vnt-wasm/validate"
+	"github.com/vntchain/vnt-wasm/wasm"
 )
 
 //clang -Xclang -ast-dump -fsyntax-only main3.cpp
@@ -127,9 +131,20 @@ type Argument struct {
 type Arguments []Argument
 
 type Contract struct {
-	ContractName string `json:"contractName"`
-	Abi          string `json:"abi"`
-	Bytecode     string `json:"bytecode"`
+	ContractName string              `json:"contractName"`
+	Abi          interface{}         `json:"abi"`
+	Bytecode     string              `json:"bytecode"`
+	SourcePath   string              `json:"sourcePath"`
+	UpdatedAt    string              `json:"updatedAt"`
+	Networks     map[string]Networks `json:"networks,omitempty"`
+}
+type Networks struct {
+	Events          map[string]Events `json:"events"`
+	Address         string            `json:"address"`
+	TransactionHash string            `json:"transactionHash"`
+}
+
+type Events struct {
 }
 
 type abiGen struct {
@@ -509,6 +524,27 @@ func (gen *abiGen) insertRegistryCode() []byte {
 
 func BuildWasm(input string, output string) {
 	buildCFile("-g -O3", input, output)
+}
+
+func ValidWasm(wasmcode []byte, abi abi.ABI) error {
+	wasm.SetDebugMode(false)
+	buf := bytes.NewReader(wasmcode)
+	wavm := &wavm.Wavm{
+		ChainContext: wavm.ChainContext{
+			Code: wasmcode,
+			Abi:  abi,
+		},
+	}
+	m, err := wasm.ReadModule(buf, wavm.ResolveImports)
+	if err != nil {
+		newErr := fmt.Errorf("%s\n%s", err.Error(), "Please check that the wasm trigger an invalid ENV function (ex: call c standard library function).")
+		return newErr
+	}
+	if err := validate.VerifyModule(m); err != nil {
+		newErr := fmt.Errorf("%s\n%s", err.Error(), "Please check that the wasm trigger an invalid ENV function (ex: call c standard library function).")
+		return newErr
+	}
+	return nil
 }
 
 type Index [][]int

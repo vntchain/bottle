@@ -10,11 +10,29 @@
 			"revisionTime": "2019-02-15T03:41:53Z"
 		},
 		{
+			"checksumSHA1": "yeUTTfXBBpALMjBKrFbCP/x4APA=",
+			"path": "github.com/briandowns/spinner",
+			"revision": "ac46072a5a9105597c1fd63f9e246477b116772e",
+			"revisionTime": "2019-03-19T03:25:42Z"
+		},
+		{
 			"checksumSHA1": "gZQ6HheWahvZzIc3phBnOwoWHjE=",
 			"origin": "github.com/vntchain/go-vnt/vendor/github.com/btcsuite/btcd/btcec",
 			"path": "github.com/btcsuite/btcd/btcec",
 			"revision": "a8e4325a47707a2edb084b35299e7b41c4091ebe",
 			"revisionTime": "2019-02-15T03:41:53Z"
+		},
+		{
+			"checksumSHA1": "2kqn8ZRm3bzflZBQg9nPZYsIo5g=",
+			"path": "github.com/cavaliercoder/grab",
+			"revision": "a224b4097c01f213344b657c2886cd429d891812",
+			"revisionTime": "2019-04-27T22:11:57Z"
+		},
+		{
+			"checksumSHA1": "Q43R3tBW9/xOqcSTQ2dm7+2I2LY=",
+			"path": "github.com/cespare/cp",
+			"revision": "db1407d84ae423533fe1d25510c1c4c4d831f0fc",
+			"revisionTime": "2018-12-20T00:00:49Z"
 		},
 		{
 			"checksumSHA1": "97BsbXOiZ8+Kr+LIuZkQFtSj7H4=",
@@ -819,6 +837,12 @@
 			"path": "github.com/rjeczalik/notify",
 			"revision": "a8e4325a47707a2edb084b35299e7b41c4091ebe",
 			"revisionTime": "2019-02-15T03:41:53Z"
+		},
+		{
+			"checksumSHA1": "WdorbyEJiNbjIOiQzM4TLb/XA7Q=",
+			"path": "github.com/robertkrimen/otto",
+			"revision": "15f95af6e78dcd2030d8195a138bd88d4f403546",
+			"revisionTime": "2018-06-17T13:11:54Z"
 		},
 		{
 			"checksumSHA1": "LjPdvMphElL0GOVNQCsmZMVgWIw=",

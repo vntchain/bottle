@@ -27,8 +27,7 @@ import (
 	"github.com/vntchain/go-vnt/accounts/abi"
 )
 
-var KeyPos [][]int
-
+var structStack = []*abi.Node{}
 var index = 0
 
 func cmd(args []string) error {
@@ -59,6 +58,16 @@ func cmd(args []string) error {
 	// 	fmt.Printf("cursor %p parent %p\n", cursor, parent)
 	// 	return clang.ChildVisit_Recurse
 	// })
+
+	structLists = abi.Root{
+		Root: make(map[string]*abi.Node),
+	}
+	varLists = abi.Root{
+		Root: make(map[string]*abi.Node),
+	}
+	functionTree = NewFunctionTree()
+
+	structStack = []*abi.Node{}
 
 	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
 		if cursor.IsNull() {
@@ -343,9 +352,6 @@ func getFunc(cursor, parent clang.Cursor) {
 		// fmt.Printf("hash %d\n ", currentFunctionHash)
 		info := getFunctionInfo(cursor, parent)
 		function := NewFunction(cursor.HashCursor(), cursor.Spelling(), info)
-		if functionTree == nil {
-			functionTree = NewFunctionTree()
-		}
 		functionTree.AddFunction(function)
 		// fmt.Printf("function %+v\n parent %d\n", function, parent.HashCursor())
 	}
