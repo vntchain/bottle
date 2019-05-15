@@ -163,7 +163,7 @@ module.exports = function(deployer) {
 
 ``migrate``文件名必须以数字为前缀，后缀为描述。数字前缀用于按顺序执行``migrate``文件，以及记录文件是否已被执行，已被执行的``migrate``文件会被再一次运行的``bottle migrate``命令所忽略，如果想要重新执行之前的``migrate``文件，请参考``migrate``命令的参数。后缀用于描述``migrate``文件，方便识别和理解文件的作用。
 
-##### artifacts.require(<contract_path>)
+##### artifacts.require(contract_path)
 
 ``migrate``文件通过``artifacts.require``来引入需要操作的智能合约，参数是``contracts``文件夹内的智能合约的绝对地址或者相对地址，通过引用，将返回一个智能合约对象，智能合约对象用于智能合约部署以及访问智能合约的方法
 
@@ -287,7 +287,9 @@ deployer.deploy(A).then(function() {
 ##### deployer.deploy(contract, args..., options)
 
 参数``contract``为使用``artifacts.require``引用的智能合约对象。
+
 参数``args...``为智能合约的构造函数的参数，用于初始化智能合约。
+
 参数``options``用于指定``from``，``gas``及``overwrite``等信息，``overwrite``用于重新部署某个已经完成部署的智能合约，默认的``options``参数在``bottle.js``文件中配置
 
 例子:
