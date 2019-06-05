@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package gas
 
 import (
@@ -32,6 +48,7 @@ const (
 )
 
 const ErrorGasLimit = "Invocation resulted in gas limit violated"
+const ErrorInitialMemLimit = "Initial memory limit"
 const ErrorDisableFloatingPoint = "Wasm contract error: disabled floating point"
 
 var errGasUintOverflow = errors.New("gas uint64 overflow")
@@ -306,66 +323,6 @@ func (gas GasCounter) AdjustedCharge(amount uint64) {
 	gas.Charge(amount)
 }
 
-// memoryGasCosts calculates the quadratic gas for memory expansion. It does so
-// only for the memory region that is expanded, not the total memory.
-// func memoryGasCost(mem *wasm.WavmMemory, newMemSize uint64) (uint64, error) {
-
-// 	if newMemSize == 0 {
-// 		return 0, nil
-// 	}
-// 	// The maximum that will fit in a uint64 is max_word_count - 1
-// 	// anything above that will result in an overflow.
-// 	// Additionally, a newMemSize which results in a
-// 	// newMemSizeWords larger than 0x7ffffffff will cause the square operation
-// 	// to overflow.
-// 	// The constant 0xffffffffe0 is the highest number that can be used without
-// 	// overflowing the gas calculation
-// 	if newMemSize > 0xffffffffe0 {
-// 		return 0, errGasUintOverflow
-// 	}
-
-// 	newMemSizeWords := toWordSize(newMemSize)
-// 	newMemSize = newMemSizeWords * 32
-
-// 	if newMemSize > uint64(mem.Len()) {
-// 		square := newMemSizeWords * newMemSizeWords
-// 		linCoef := newMemSizeWords * params.MemoryGas
-// 		quadCoef := square / params.QuadCoeffDiv
-// 		newTotalFee := linCoef + quadCoef
-
-// 		fee := newTotalFee - mem.lastGasCost
-// 		mem.lastGasCost = newTotalFee
-
-// 		return fee, nil
-// 	}
-// 	return 0, nil
-// }
-
-// func (vm *VM) GasGetBalanceFromAddress() error {
-// 	return vm.adjustedCharge(constGasFunc(20))
-// }
-
-// func (vm *VM) GasStorageWrite() error {
-// 	idx := big.NewInt(int64(vm.ctx.locals[0])).Uint64()
-// 	loc := common.BytesToHash(vm.Memory().GetPtr(idx))
-// 	validx := big.NewInt(int64(vm.ctx.locals[1])).Uint64()
-// 	val := common.BytesToHash(vm.Memory().GetPtr(validx))
-// 	formerVal := vm.StateDB.GetState(vm.Contract.Address(), loc)
-// 	var err error
-// 	if common.EmptyHash(formerVal) && !common.EmptyHash(val) {
-// 		log.Debug("---------", "set", "-------------")
-// 		err = vm.adjustedCharge(params.SstoreSetGas)
-// 	} else {
-// 		log.Debug("---------", "reset", "-------------")
-// 		err = vm.adjustedCharge(params.SstoreResetGas)
-// 	}
-// 	return err
-// }
-
-// func (vm *VM) GasStorageRead() error {
-// 	return vm.adjustedCharge(params.SloadGas)
-// }
-
 func (gas GasCounter) GasQuickStep() {
 	gas.Charge(constGasFunc(vm.GasQuickStep))
 }
@@ -488,7 +445,6 @@ func (gas GasCounter) GasLog(size uint64, topics uint64) {
 	if costgas, overflow = math.SafeAdd(costgas, topics*params.LogTopicGas); overflow {
 		panic(errGasUintOverflow)
 	}
-
 	var memorySizeGas uint64
 	if memorySizeGas, overflow = math.SafeMul(requestedSize, params.LogDataGas); overflow {
 		panic(errGasUintOverflow)
@@ -503,13 +459,8 @@ func (gas GasCounter) GasCall(address common.Address, value, gasLimit, blockNumb
 	var (
 		callgas        = gas.GasTable.Calls
 		transfersValue = value.Sign() != 0
-		eip158         = chainConfig.IsEIP158(blockNumber)
 	)
-	if eip158 {
-		if transfersValue && statedb.Empty(address) {
-			callgas += params.CallNewAccountGas
-		}
-	} else if !statedb.Exist(address) {
+	if transfersValue && statedb.Empty(address) {
 		callgas += params.CallNewAccountGas
 	}
 	if transfersValue {
@@ -573,6 +524,10 @@ func (gas GasCounter) GasLoad() {
 	gas.Charge(constGasFunc(gas.GasTable.SLoad))
 }
 
+func (gas GasCounter) GasEcrecover() {
+	gas.Charge(constGasFunc(params.EcrecoverGas))
+}
+
 func (gas GasCounter) GasPow(exponent *big.Int) {
 	expByteLen := uint64((exponent.BitLen() + 7) / 8)
 	var (
@@ -583,6 +538,10 @@ func (gas GasCounter) GasPow(exponent *big.Int) {
 		panic(errGasUintOverflow)
 	}
 	gas.Charge(constGasFunc(costgas))
+}
+
+func (gas GasCounter) GasCostZero() {
+	gas.Charge(constGasFunc(0))
 }
 
 func (gas GasCounter) GasReturnAddress() {
@@ -602,5 +561,8 @@ func (gas GasCounter) GasReturnPointer(size uint64) {
 }
 
 func (gas GasCounter) GasInitialMemory(initial uint64) {
-	gas.AdjustedCharge(constGasFunc(initial * WasmCostsInitialMem))
+	amount := initial * WasmCostsInitialMem
+	if !gas.ChargeGas(amount) {
+		panic(ErrorInitialMemLimit)
+	}
 }

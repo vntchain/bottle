@@ -83,14 +83,14 @@ type VNT struct {
 
 	APIBackend *VntAPIBackend
 
-	miner     *miner.Miner
-	gasPrice  *big.Int
-	vnterbase common.Address
+	miner    *miner.Miner
+	gasPrice *big.Int
+	coinbase common.Address
 
 	networkId     uint64
 	netRPCService *vntapi.PublicNetAPI
 
-	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and vnterbase)
+	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and coinbase)
 }
 
 func (s *VNT) AddLesServer(ls LesServer) {
@@ -127,7 +127,7 @@ func New(ctx *node.ServiceContext, config *Config, node *node.Node) (*VNT, error
 		shutdownChan:   make(chan bool),
 		networkId:      config.NetworkId,
 		gasPrice:       config.GasPrice,
-		vnterbase:      config.Etherbase,
+		coinbase:       config.Coinbase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks),
 	}
@@ -285,57 +285,57 @@ func (s *VNT) ResetWithGenesisBlock(gb *types.Block) {
 	s.blockchain.ResetWithGenesisBlock(gb)
 }
 
-func (s *VNT) Vnterbase() (eb common.Address, err error) {
+func (s *VNT) Coinbase() (eb common.Address, err error) {
 	s.lock.RLock()
-	vnterbase := s.vnterbase
+	coinbase := s.coinbase
 	s.lock.RUnlock()
 
-	if vnterbase != (common.Address{}) {
-		return vnterbase, nil
+	if coinbase != (common.Address{}) {
+		return coinbase, nil
 	}
 	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
 		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
-			vnterbase := accounts[0].Address
+			coinbase := accounts[0].Address
 
 			s.lock.Lock()
-			s.vnterbase = vnterbase
+			s.coinbase = coinbase
 			s.lock.Unlock()
 
-			log.Info("Etherbase automatically configured", "address", vnterbase)
-			return vnterbase, nil
+			log.Info("Coinbase automatically configured", "address", coinbase)
+			return coinbase, nil
 		}
 	}
-	return common.Address{}, fmt.Errorf("vnterbase must be explicitly specified")
+	return common.Address{}, fmt.Errorf("coinbase must be explicitly specified")
 }
 
-// SetEtherbase sets the mining reward address.
-func (s *VNT) SetEtherbase(vnterbase common.Address) {
+// SetCoinbase sets the block producing reward address.
+func (s *VNT) SetCoinbase(coinbase common.Address) {
 	s.lock.Lock()
-	s.vnterbase = vnterbase
+	s.coinbase = coinbase
 	s.lock.Unlock()
 
-	s.miner.SetEtherbase(vnterbase)
+	s.miner.SetCoinbase(coinbase)
 }
 
-func (s *VNT) StartMining(local bool) error {
-	eb, err := s.Vnterbase()
+func (s *VNT) StartProducing(local bool) error {
+	eb, err := s.Coinbase()
 	if err != nil {
-		log.Error("Cannot start mining without vnterbase", "err", err)
-		return fmt.Errorf("vnterbase missing: %v", err)
+		log.Error("Cannot start block producing without coinbase", "err", err)
+		return fmt.Errorf("coinbase missing: %v", err)
 	}
 
 	if dpos, ok := s.engine.(*dpos.Dpos); ok {
 		wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 		if wallet == nil || err != nil {
-			log.Error("Etherbase account unavailable locally", "err", err)
+			log.Error("Coinbase account unavailable locally", "err", err)
 			return fmt.Errorf("signer missing: %v", err)
 		}
 		dpos.Authorize(eb, wallet.SignHash)
 	}
 	if local {
-		// If local (CPU) mining is started, we can disable the transaction rejection
-		// mechanism introduced to speed sync times. CPU mining on mainnet is ludicrous
-		// so none will ever hit this path, whereas marking sync done on CPU mining
+		// If local (CPU) block producing is started, we can disable the transaction rejection
+		// mechanism introduced to speed sync times. CPU block producing on mainnet is ludicrous
+		// so none will ever hit this path, whereas marking sync done on CPU block producing
 		// will ensure that private networks work in single miner mode too.
 		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
 	}
@@ -343,8 +343,8 @@ func (s *VNT) StartMining(local bool) error {
 	return nil
 }
 
-func (s *VNT) StopMining()         { s.miner.Stop() }
-func (s *VNT) IsMining() bool      { return s.miner.Mining() }
+func (s *VNT) StopProducing()      { s.miner.Stop() }
+func (s *VNT) IsProducing() bool   { return s.miner.Producing() }
 func (s *VNT) Miner() *miner.Miner { return s.miner }
 
 func (s *VNT) AccountManager() *accounts.Manager  { return s.accountManager }
@@ -371,7 +371,6 @@ func (s *VNT) Protocols() []vntp2p.Protocol {
 // VNT protocol implementation.
 func (s *VNT) Start(srvr *vntp2p.Server) error {
 	// Start the bloom bits servicing goroutines
-	log.Info("yhx-test", "start", srvr)
 	s.startBloomHandlers()
 
 	// Start the RPC service

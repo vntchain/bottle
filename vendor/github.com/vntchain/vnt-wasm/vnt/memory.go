@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of go-vnt.
+//
+// go-vnt is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// go-vnt is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with go-vnt. If not, see <http://www.gnu.org/licenses/>.
+
 package vnt
 
 import (
@@ -112,13 +128,6 @@ func (m *WavmMemory) Get(offset uint64) (cpy []byte) {
 	}
 
 	return
-}
-
-func (m *WavmMemory) NormalizeOffset(offset uint32) uint32 {
-	if int32(offset) < 0 {
-		offset = uint32(int32(m.MemSize()) + int32(offset))
-	}
-	return offset
 }
 
 // GetPtr returns the offset + size

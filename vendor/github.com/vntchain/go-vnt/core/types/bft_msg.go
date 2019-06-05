@@ -1,11 +1,29 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package types
 
 import (
 	"math/big"
 
 	"fmt"
+
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/crypto/sha3"
+	"github.com/vntchain/go-vnt/log"
 	"github.com/vntchain/go-vnt/rlp"
 )
 
@@ -61,10 +79,13 @@ func (msg *PreprepareMsg) GetRound() uint32 {
 func (msg *PreprepareMsg) Hash() (hash common.Hash) {
 	hasher := sha3.NewKeccak256()
 
-	rlp.Encode(hasher, []interface{}{
+	if err := rlp.Encode(hasher, []interface{}{
 		msg.Round,
 		msg.Block.Hash(),
-	})
+	}); err != nil {
+		log.Error("Calc PreprepareMsg hash", "error", err)
+		return common.Hash{}
+	}
 
 	hasher.Sum(hash[:0])
 	return
@@ -94,13 +115,16 @@ func (msg *PrepareMsg) Hash() (hash common.Hash) {
 	hasher := sha3.NewKeccak256()
 
 	// 加入消息类型是为了区别Prepare消息和commit消息
-	rlp.Encode(hasher, []interface{}{
+	if err := rlp.Encode(hasher, []interface{}{
 		BftPrepareMessage,
 		msg.Round,
 		msg.PrepareAddr,
 		msg.BlockNumber,
 		msg.BlockHash,
-	})
+	}); err != nil {
+		log.Error("Calc PrepareMsg hash", "error", err)
+		return common.Hash{}
+	}
 
 	hasher.Sum(hash[:0])
 	return
@@ -129,13 +153,16 @@ func (msg *CommitMsg) GetRound() uint32 {
 func (msg *CommitMsg) Hash() (hash common.Hash) {
 	hasher := sha3.NewKeccak256()
 
-	rlp.Encode(hasher, []interface{}{
+	if err := rlp.Encode(hasher, []interface{}{
 		BftCommitMessage,
 		msg.Round,
 		msg.Commiter,
 		msg.BlockNumber,
 		msg.BlockHash,
-	})
+	}); err != nil {
+		log.Error("Calc CommitMsg hash", "error", err)
+		return common.Hash{}
+	}
 
 	hasher.Sum(hash[:0])
 	return

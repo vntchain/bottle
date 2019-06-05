@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package vntp2p
 
 import (
@@ -6,16 +22,16 @@ import (
 	"bufio"
 	"crypto/ecdsa"
 	"encoding/json"
-	"sync"
-
 	"net"
+	"sync"
+	"sync/atomic"
 
-	"github.com/vntchain/go-vnt/event"
-	"github.com/vntchain/go-vnt/log"
 	inet "github.com/libp2p/go-libp2p-net"
 	libp2p "github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
+	"github.com/vntchain/go-vnt/event"
+	"github.com/vntchain/go-vnt/log"
 )
 
 type PeerEventType string
@@ -64,33 +80,39 @@ type PeerInfo struct {
 }
 
 type Peer struct {
-	rw        inet.Stream
-	log       log.Logger
-	events    *event.Feed
-	err       chan error
-	messenger map[string]*VNTMessenger // protocolName - vntMessenger
-	wg        sync.WaitGroup
-	// need to add wg
+	rw      inet.Stream // libp2p stream
+	reseted int32       // Whether stream reseted
+	log     log.Logger
+	events  *event.Feed
+	err     chan error
+	msgers  map[string]*VNTMsger // protocolName - vntMessenger
+	server  *Server
+	wg      sync.WaitGroup
 }
 
-func newPeer(conn *Stream) *Peer {
-	m := make(map[string]*VNTMessenger)
+func newPeer(conn *Stream, server *Server) *Peer {
+	m := make(map[string]*VNTMsger)
 	for i := range conn.Protocols {
 		proto := conn.Protocols[i]
-		vntMessenger := &VNTMessenger{
+		vntMessenger := &VNTMsger{
 			protocol: proto,
 			in:       make(chan Msg),
-			err:      make(chan error),
+			err:      make(chan error, 100),
 			w:        conn.Conn,
 		}
 		m[proto.Name] = vntMessenger
 	}
 
 	p := &Peer{
-		rw:        conn.Conn,
-		log:       log.New(),
-		err:       make(chan error),
-		messenger: m,
+		rw:      conn.Conn,
+		log:     log.New(),
+		err:     make(chan error),
+		reseted: 0,
+		msgers:  m,
+		server:  server,
+	}
+	for _, msger := range p.msgers {
+		msger.peer = p
 	}
 
 	return p
@@ -156,8 +178,24 @@ func parseMultiaddr(maddr ma.Multiaddr) net.Addr {
 
 func (p *Peer) Disconnect(reason DiscReason) {
 	// test for it
-	p.rw.Conn().Close()
+	// p.rw.Conn().Close()
 	// p.rw.Close()
+
+	p.Reset()
+}
+
+// Reset Close both direction. Use this to tell the remote side to hang up and go away.
+// But only reset once.
+func (p *Peer) Reset() {
+	if !atomic.CompareAndSwapInt32(&p.reseted, 0, 1) {
+		return
+	}
+
+	if err := p.rw.Reset(); err != nil {
+		log.Debug("Reset peer connection", "peer", p.RemoteID().ToString(), "error", err.Error())
+	} else {
+		log.Debug("Reset peer connection success", "peer", p.RemoteID().ToString())
+	}
 }
 
 func (p *Peer) Info() *PeerInfo {
@@ -176,27 +214,36 @@ func (p *Peer) Info() *PeerInfo {
 }
 
 func (p *Peer) run() (remoteRequested bool, err error) {
-	for _, msger := range p.messenger {
+	for _, msger := range p.msgers {
 		proto := msger.protocol
 		m := msger
+		p.wg.Add(1)
 		go func() {
-			p.wg.Add(1)
 			err := proto.Run(p, m)
-			log.Info("yhx-test", "run protocol error log", err)
-			p.err <- err
+			log.Debug("Run protocol error", "protocol", proto.Name, "error", err)
+
+			p.sendError(err)
 			p.wg.Done()
 		}()
 	}
 
 	err = <-p.err
 	remoteRequested = true
-
-	p.rw.Close()
-	log.Info("yhx-test remote peer request close, but we need to wait for other protocol", "peerid", p.RemoteID())
+	p.Reset()
+	log.Debug("P2P remote peer request close, but we need to wait for other protocol", "peer", p.RemoteID())
 	p.wg.Wait()
-	log.Info("yhx-test wait complete!", "peerid", p.RemoteID())
+	log.Debug("P2P wait complete!", "peer", p.RemoteID())
 
 	return remoteRequested, err
+}
+
+// sendError 为Peer的协议开了多个goroutine，可能多个协议都返回错误，
+// 退出只接收一次错误就可以，所以采用非阻塞发送错误
+func (p *Peer) sendError(err error) {
+	select {
+	case p.err <- err:
+	default:
+	}
 }
 
 type Stream struct {

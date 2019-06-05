@@ -89,14 +89,10 @@ func NewFunctionTree() *FunctionTree {
 }
 
 func (t *FunctionTree) AddFunction(f *Function) {
-	t.Mutex.Lock()
-	defer t.Mutex.Unlock()
 	t.Root[f.Hash] = f
 }
 
 func (t *FunctionTree) AddCall(hash uint32, name string, path string, line int, offset int, size int) {
-	t.Mutex.Lock()
-	defer t.Mutex.Unlock()
 	t.Root[hash].AddCall(name, hash, path, line, offset, size)
 }
 

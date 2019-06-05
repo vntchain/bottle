@@ -17,7 +17,6 @@
 package miner
 
 import (
-	"bytes"
 	"encoding/json"
 	"math/big"
 	"sync"
@@ -38,8 +37,8 @@ import (
 )
 
 const (
-	resultQueueSize  = 10
-	miningLogAtDepth = 5
+	resultQueueSize     = 10
+	producingLogAtDepth = 5
 
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
@@ -121,8 +120,8 @@ type worker struct {
 	unconfirmed *unconfirmedBlocks // set of locally mined blocks pending canonicalness confirmations
 
 	// atomic status counters
-	mining int32
-	atWork int32
+	producing int32
+	atWork    int32
 
 	roundTimer      *time.Timer // Timer to trigger each round of producing block
 	resetTimerEvent chan *big.Int
@@ -144,7 +143,7 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 		proc:            vnt.BlockChain().Validator(),
 		coinbase:        coinbase,
 		agents:          make(map[Agent]struct{}),
-		unconfirmed:     newUnconfirmedBlocks(vnt.BlockChain(), miningLogAtDepth),
+		unconfirmed:     newUnconfirmedBlocks(vnt.BlockChain(), producingLogAtDepth),
 		roundTimer:      time.NewTimer(time.Second),
 		resetTimerEvent: make(chan *big.Int, 1),
 		minerStop:       make(chan struct{}, 1),
@@ -167,7 +166,7 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 	return worker
 }
 
-func (self *worker) setEtherbase(addr common.Address) {
+func (self *worker) setCoinbase(addr common.Address) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	self.coinbase = addr
@@ -180,7 +179,7 @@ func (self *worker) setExtra(extra []byte) {
 }
 
 func (self *worker) pending() (*types.Block, *state.StateDB) {
-	if atomic.LoadInt32(&self.mining) == 0 {
+	if atomic.LoadInt32(&self.producing) == 0 {
 		// return a snapshot to avoid contention on currentMu mutex
 		self.snapshotMu.RLock()
 		defer self.snapshotMu.RUnlock()
@@ -193,7 +192,7 @@ func (self *worker) pending() (*types.Block, *state.StateDB) {
 }
 
 func (self *worker) pendingBlock() *types.Block {
-	if atomic.LoadInt32(&self.mining) == 0 {
+	if atomic.LoadInt32(&self.producing) == 0 {
 		// return a snapshot to avoid contention on currentMu mutex
 		self.snapshotMu.RLock()
 		defer self.snapshotMu.RUnlock()
@@ -209,11 +208,11 @@ func (self *worker) start() {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	atomic.StoreInt32(&self.mining, 1)
+	atomic.StoreInt32(&self.producing, 1)
 
 	// Init bft
 	if dp, ok := self.engine.(*dpos.Dpos); ok {
-		dp.InitBft(self.SendBftMsg, self.SendBftPeerChangeMsg, self.chain.VerifyBlock, self.writeBlock)
+		dp.InitBft(self.SendBftMsg, self.SendBftPeerChangeMsg, self.chain.VerifyBlockForBft, self.writeBlock)
 		// 刚启动节点的bft节点设置
 		currentRoot := self.chain.CurrentHeader().Root
 		witnessesUrl := self.chain.Config().Dpos.WitnessesUrl
@@ -241,16 +240,16 @@ func (self *worker) stop() {
 
 	self.mu.Lock()
 	defer self.mu.Unlock()
-	if atomic.LoadInt32(&self.mining) == 1 {
+	if atomic.LoadInt32(&self.producing) == 1 {
 		for agent := range self.agents {
 			agent.Stop()
 		}
 	}
-	atomic.StoreInt32(&self.mining, 0)
+	atomic.StoreInt32(&self.producing, 0)
 	atomic.StoreInt32(&self.atWork, 0)
 
 	if dp, ok := self.engine.(*dpos.Dpos); ok {
-		dp.MiningStop()
+		dp.ProducingStop()
 	}
 }
 
@@ -279,7 +278,7 @@ func (self *worker) update() {
 		select {
 		// Handle ChainHeadEvent
 		case headEvent := <-self.chainHeadCh:
-			log.Debug("Worker: new block write finished", "block hash", headEvent.Block.Hash())
+			log.Debug("Worker: new block write finished", "block hash", headEvent.Block.Hash().String())
 			if self.config.Dpos != nil {
 				if dp, ok := self.engine.(*dpos.Dpos); ok {
 					dp.CleanOldMsg(headEvent.Block.Number())
@@ -292,12 +291,12 @@ func (self *worker) update() {
 
 			// Handle NewTxsEvent
 		case ev := <-self.txsCh:
-			// Apply transactions to the pending state if we're not mining.
+			// Apply transactions to the pending state if we're not producing block.
 			//
 			// Note all transactions received may not be continuous with transactions
-			// already included in the current mining block. These transactions will
+			// already included in the current producing block. These transactions will
 			// be automatically eliminated.
-			if self.config.Dpos == nil && atomic.LoadInt32(&self.mining) == 0 {
+			if self.config.Dpos == nil && atomic.LoadInt32(&self.producing) == 0 {
 				self.currentMu.Lock()
 				txs := make(map[common.Address]types.Transactions)
 				for _, tx := range ev.Txs {
@@ -336,6 +335,7 @@ func (self *worker) update() {
 	}
 }
 
+// TODO vnt this is never used for Seal never return block
 func (self *worker) wait() {
 	for {
 		for result := range self.recv {
@@ -396,7 +396,7 @@ func (self *worker) recBftMsg() {
 
 // push sends a new work task to currently live miner agents.
 func (self *worker) push(work *Work) {
-	if atomic.LoadInt32(&self.mining) != 1 {
+	if atomic.LoadInt32(&self.producing) != 1 {
 		return
 	}
 	for agent := range self.agents {
@@ -443,7 +443,7 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 	}
 	work := &Work{
 		config:    self.config,
-		signer:    types.NewEIP155Signer(self.config.ChainID),
+		signer:    types.NewHubbleSigner(self.config.ChainID),
 		state:     state,
 		header:    header,
 		createdAt: time.Now(),
@@ -483,13 +483,13 @@ func (self *worker) commitNewWork() {
 		Extra:      self.extra,
 		Time:       big.NewInt(tstamp),
 	}
-	// Only set the coinbase if we are mining (avoid spurious block rewards)
-	if atomic.LoadInt32(&self.mining) == 1 {
+	// Only set the coinbase if we are producing (avoid spurious block rewards)
+	if atomic.LoadInt32(&self.producing) == 1 {
 		header.Coinbase = self.coinbase
 	}
 
 	preErr := self.engine.Prepare(self.chain, header)
-	if atomic.LoadInt32(&self.mining) == 1 {
+	if atomic.LoadInt32(&self.producing) == 1 {
 		self.resetTimerEvent <- header.Time
 	}
 	if time.Unix(header.Time.Int64(), 0).Sub(time.Now()) <= 0 {
@@ -497,23 +497,10 @@ func (self *worker) commitNewWork() {
 		return
 	}
 
-	// If we are care about TheDAO hard-fork check whether to override the extra-data or not
-	if daoBlock := self.config.DAOForkBlock; daoBlock != nil {
-		// Check whether the block is among the fork extra-override range
-		limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
-		if header.Number.Cmp(daoBlock) >= 0 && header.Number.Cmp(limit) < 0 {
-			// Depending whether we support or oppose the fork, override differently
-			if self.config.DAOForkSupport {
-				header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
-			} else if bytes.Equal(header.Extra, params.DAOForkBlockExtra) {
-				header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
-			}
-		}
-	}
 	// Could potentially happen if starting to mine in an odd state.
 	err := self.makeCurrent(parent, header)
 	if err != nil {
-		log.Error("Failed to create mining context", "err", err)
+		log.Error("Failed to create producing context", "err", err)
 		return
 	}
 	// Create the current work task and check any fork transitions needed
@@ -534,9 +521,9 @@ func (self *worker) commitNewWork() {
 	blockheaderjson, _ := json.Marshal(work.Block.Header())
 	blocktxjson, _ := json.Marshal(work.Block.Transactions())
 	log.Debug("worker", "func", "commitNewWork", "block header", string(blockheaderjson), "block tx", string(blocktxjson))
-	// We only care about logging if we're actually mining.
-	if atomic.LoadInt32(&self.mining) == 1 {
-		log.Info("Commit new mining work", "number", work.Block.Number(), "txs", work.tcount, "elapsed", common.PrettyDuration(time.Since(tstart)))
+	// We only care about logging if we're actually producing.
+	if atomic.LoadInt32(&self.producing) == 1 {
+		log.Info("Commit new producing work", "number", work.Block.Number(), "txs", work.tcount, "elapsed", common.PrettyDuration(time.Since(tstart)))
 		self.unconfirmed.Shift(work.Block.NumberU64() - 1)
 	}
 
@@ -544,7 +531,7 @@ func (self *worker) commitNewWork() {
 	self.updateSnapshot()
 
 	if preErr != nil {
-		log.Debug("Failed to prepare header for mining", "preErr", preErr)
+		log.Debug("Failed to prepare header for producing", "preErr", preErr)
 		return
 	}
 
@@ -608,14 +595,7 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(env.signer, tx)
-		// Check whether the tx is replay protected. If we're not in the EIP155 hf
-		// phase, start ignoring the sender until we do.
-		if tx.Protected() && !env.config.IsEIP155(env.header.Number) {
-			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", env.config.EIP155Block)
 
-			txs.Pop()
-			continue
-		}
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), common.Hash{}, env.tcount)
 

@@ -1,14 +1,31 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package dpos
 
 import (
 	"fmt"
-	"github.com/vntchain/go-vnt/common"
-	"github.com/vntchain/go-vnt/core/types"
-	"github.com/vntchain/go-vnt/log"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/vntchain/go-vnt/common"
+	"github.com/vntchain/go-vnt/core/types"
+	"github.com/vntchain/go-vnt/log"
 )
 
 // BFT step
@@ -34,12 +51,12 @@ type BftManager struct {
 	h           *big.Int                    // local block chain height, protect by newRoundRWLock
 	r           uint32                      // local BFT round, protect by newRoundRWLock
 	step        uint32                      // local BFT round, protect by atomic operation
-	witnessList map[common.Address]struct{} // current witness list, rely on mining
+	witnessList map[common.Address]struct{} // current witness list, rely on producing
 
 	newRoundRWLock sync.RWMutex // RW lock for switch to new round
 
 	blockRound uint32 // round of sealing block, no need lock
-	mining     uint32 // mining or not, atomic read and write
+	producing  uint32 // producing or not, atomic read and write
 
 	// callbacks
 	sendBftMsg  func(types.ConsensusMsg)
@@ -59,7 +76,7 @@ func newBftManager(dp *Dpos) *BftManager {
 		r:           0,
 		step:        newRound,
 		witnessList: make(map[common.Address]struct{}, dp.config.WitnessesNum),
-		mining:      0,
+		producing:   0,
 	}
 }
 
@@ -93,12 +110,12 @@ func (b *BftManager) handleBftMsg(msg types.ConsensusMsg) error {
 		log.Trace("handle msg end", "hash", msgHash)
 	}()
 
-	// If not mining, no need deal with these bft msg right now,
-	// save to msg pool, if you are witness and mining after sync,
+	// If not producing, no need deal with these bft msg right now,
+	// save to msg pool, if you are witness and producing after sync,
 	// you will fast deal with these msg.
-	if atomic.LoadUint32(&b.mining) == 0 {
-		b.mp.addMsg(msg)
-		log.Debug("HandleBftMsg: return for not mining")
+	if atomic.LoadUint32(&b.producing) == 0 {
+		_ = b.mp.addMsg(msg)
+		log.Debug("HandleBftMsg: return for not producing")
 		return nil
 	}
 
@@ -248,7 +265,9 @@ func (b *BftManager) startCommit(prePreMsg *types.PreprepareMsg) error {
 	if err != nil {
 		return err
 	}
-	b.roundMp.addMsg(commitMsg)
+	if err := b.roundMp.addMsg(commitMsg); err != nil {
+		return err
+	}
 
 	// The one of first changing step, send the msg
 	if ok := atomic.CompareAndSwapUint32(&b.step, prepared, committing); ok {
@@ -261,9 +280,11 @@ func (b *BftManager) startCommit(prePreMsg *types.PreprepareMsg) error {
 // sendMsg only witness send bft message.
 // Caller make sure has the newRoundRWLock.
 func (b *BftManager) sendMsg(msg types.ConsensusMsg) {
+	log.Trace("bft sendMsg start")
 	if _, ok := b.witnessList[b.coinBase]; ok {
 		b.sendBftMsg(msg)
 	}
+	log.Trace("bft sendMsg success")
 }
 
 func (b *BftManager) tryWriteBlockStep() error {
@@ -386,14 +407,14 @@ func (b *BftManager) startSync(block *types.Block) {
 	log.Debug("Bft manager startPrePrepare sync")
 }
 
-func (b *BftManager) miningStop() {
-	atomic.StoreUint32(&b.mining, 0)
-	log.Debug("BFT stop mining")
+func (b *BftManager) producingStop() {
+	atomic.StoreUint32(&b.producing, 0)
+	log.Debug("BFT stop producing")
 }
 
-func (b *BftManager) miningStart() {
-	atomic.StoreUint32(&b.mining, 1)
-	log.Debug("BFT start mining")
+func (b *BftManager) producingStart() {
+	atomic.StoreUint32(&b.producing, 1)
+	log.Debug("BFT start producing")
 }
 
 func (b *BftManager) validWitness(wit common.Address) bool {

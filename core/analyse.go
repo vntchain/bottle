@@ -128,8 +128,6 @@ func (h *Hint) contructorCheck() (HintMessages, error) {
 	}
 
 	constructorReg := `(constructor)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
-	functionTree.Mutex.Lock()
-	defer functionTree.Mutex.Unlock()
 	for _, v := range functionTree.Root {
 		call := fmt.Sprintf(constructorReg, escape(v.Name))
 		reg := regexp.MustCompile(call)
@@ -233,8 +231,6 @@ func Traversal(node *abi.Node) []string {
 func (h *Hint) callCheck() (HintMessages, error) {
 	var msgs HintMessages
 	callReg := `(CALL)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
-	functionTree.Mutex.Lock()
-	defer functionTree.Mutex.Unlock()
 	for _, v := range functionTree.Root {
 		call := fmt.Sprintf(callReg, escape(v.Name))
 		reg := regexp.MustCompile(call)
@@ -306,8 +302,6 @@ func (h *Hint) callCheck() (HintMessages, error) {
 func (h *Hint) eventCheck() (HintMessages, error) {
 	var msgs HintMessages
 	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
-	functionTree.Mutex.Lock()
-	defer functionTree.Mutex.Unlock()
 	for _, v := range functionTree.Root {
 		event := fmt.Sprintf(eventReg, escape(v.Name))
 		reg := regexp.MustCompile(event)
@@ -387,8 +381,6 @@ func (h *Hint) eventCheck() (HintMessages, error) {
 func (h *Hint) payableCheck() (HintMessages, error) {
 	var msgs HintMessages
 	//payable和unmutable不能共存
-	functionTree.Mutex.Lock()
-	defer functionTree.Mutex.Unlock()
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeNone {
 			//ignore
@@ -411,8 +403,6 @@ func (h *Hint) payableCheck() (HintMessages, error) {
 func (h *Hint) exportCheck() (HintMessages, error) {
 	var msgs HintMessages
 	exportReg := `[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
-	functionTree.Mutex.Lock()
-	defer functionTree.Mutex.Unlock()
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeNone {
 			//ignore
@@ -465,8 +455,6 @@ func (h *Hint) exportCheck() (HintMessages, error) {
 
 func (h *Hint) checkUnmutableFunction() (HintMessages, error) {
 	var msgs HintMessages
-	functionTree.Mutex.Lock()
-	defer functionTree.Mutex.Unlock()
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeUnmutable {
 			for _, call := range v.Call {

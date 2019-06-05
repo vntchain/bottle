@@ -87,8 +87,8 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	if err != nil {
 		return nil, 0, err
 	}
-	// Create a new context to be used in the EVM environment
-	context := NewWAVMContext(msg, header, bc, author)
+	// Create a new context to be used in the VM environment
+	context := NewVMContext(msg, header, bc, author)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
 	var (
@@ -110,11 +110,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	origin = vmenv.GetContext().Origin
 	// Update the state with pending changes
 	var root []byte
-	if config.IsByzantium(header.Number) {
-		statedb.Finalise(true)
-	} else {
-		root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
-	}
+	statedb.Finalise(true)
 	*usedGas += gas
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used by the tx
