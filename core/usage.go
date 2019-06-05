@@ -33,7 +33,7 @@ var (
    Copyright 2018-2019 The bottle Authors
 
 USAGE:
-   {{.App.HelpName}} [global options]{{if .App.Commands}} command [command options]{{end}} {{if .App.ArgsUsage}}{{.App.ArgsUsage}}{{else}}[arguments...]{{end}}
+   {{.App.HelpName}} [global options]{{if .App.Commands}} command [command options]{{end}} {{if .App.ArgsUsage}}{{.App.ArgsUsage}}{{else}}[arguments11...]{{end}}
    {{if .App.Version}}
 VERSION:
    {{.App.Version}}
@@ -52,8 +52,7 @@ COPYRIGHT:
    {{.App.Copyright}}
    {{end}}
 `
-	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} [arguments...]
-{{if .cmd.Description}}{{.cmd.Description}}
+	CommandHelpTemplate = `{{if .cmd.Description}}{{.cmd.Description}}
 {{end}}{{if .cmd.Subcommands}}
 SUBCOMMANDS:
 	{{range .cmd.Subcommands}}{{.Name}}{{with .ShortName}}, {{.}}{{end}}{{ "\t" }}{{.Usage}}
@@ -73,32 +72,24 @@ type flagGroup struct {
 // AppHelpFlagGroups is the application flags, grouped by functionality.
 var AppHelpFlagGroups = []flagGroup{
 	{
-		Name: "COMPILE",
+		Name: "PATH",
 		Flags: []cli.Flag{
 			contractCodeFlag,
 			includeFlag,
 			outputFlag,
-		},
-	},
-	{
-		Name: "COMPRESS",
-		Flags: []cli.Flag{
-			wasmFlag,
-			abiFlag,
-			outputFlag,
-		},
-	},
-	{
-		Name: "DECOMPRESS",
-		Flags: []cli.Flag{
 			compressFileFlag,
-			outputFlag,
+			abiFlag,
+			wasmFlag,
 		},
 	},
 	{
-		Name: "HINT",
+		Name: "MIGRATE",
 		Flags: []cli.Flag{
-			contractCodeFlag,
+			resetFlag,
+			fromFlag,
+			toFlag,
+			networkFlag,
+			verboseRpcFlag,
 		},
 	},
 	{
@@ -142,6 +133,7 @@ func flagCategory(flag cli.Flag) string {
 func init() {
 	// Override the default app help template
 	cli.AppHelpTemplate = AppHelpTemplate
+	cli.CommandHelpTemplate = CommandHelpTemplate
 
 	// Define a one shot struct to pass to the usage template
 	type helpData struct {

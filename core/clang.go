@@ -27,8 +27,7 @@ import (
 	"github.com/vntchain/go-vnt/accounts/abi"
 )
 
-var KeyPos [][]int
-
+var structStack = []*abi.Node{}
 var index = 0
 
 func cmd(args []string) error {
@@ -60,6 +59,16 @@ func cmd(args []string) error {
 	// 	return clang.ChildVisit_Recurse
 	// })
 
+	structLists = abi.Root{
+		Root: make(map[string]*abi.Node),
+	}
+	varLists = abi.Root{
+		Root: make(map[string]*abi.Node),
+	}
+	functionTree = NewFunctionTree()
+
+	structStack = []*abi.Node{}
+
 	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
 		if cursor.IsNull() {
 			return clang.ChildVisit_Continue
@@ -75,7 +84,6 @@ func cmd(args []string) error {
 		return clang.ChildVisit_Continue
 	})
 	structLists.Fulling()
-
 	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
 		if cursor.IsNull() {
 			return clang.ChildVisit_Continue
@@ -126,10 +134,9 @@ func createStructList(cursor, parent clang.Cursor) {
 				// fmt.Printf("cursorname %s fieldtype %s cursor", cursorname, fieldtype)
 			} else {
 				// fmt.Printf("typedef 匿名结构体\n")
-				// fmt.Printf("cursortype %s\n", cursortype)
 				node := abi.NewNode(cursorname, cursortype, "")
+				// structStack = append(structStack, node)
 				structLists.Root[cursortype] = node
-				// fmt.Printf("typedef 匿名结构体 end\n")
 			}
 		} else {
 			node := abi.NewNode(cursorname, cursortype, "")
@@ -147,14 +154,15 @@ func createStructList(cursor, parent clang.Cursor) {
 		// fmt.Printf("cursor.Type() %s\n", cursor.Type().Spelling())
 		if strings.Contains(cursor.TypedefDeclUnderlyingType().Spelling(), "struct") {
 			fieldname := cursor.TypedefDeclUnderlyingType().Spelling()[7:]
-			// fmt.Printf("cursorname %s fieldname %s\n", cursorname, fieldname)
 			if fieldname == cursorname { //匿名结构体
+				// fmt.Printf("匿名结构体\n")
 			} else {
 				node := abi.NewNode(cursorname, fieldname, "")
 				structLists.Root[cursorname] = node
 			}
 		}
 	} else if decl == clang.Cursor_StructDecl && pdecl == clang.Cursor_StructDecl { //结构体内部定义的结构体
+		// fmt.Printf("结构体内部定义的结构体\n")
 		if cursorname == "" {
 			index = index + 1
 			fieldtype := fmt.Sprintf("%s@@@%d", usr, index)
@@ -166,23 +174,20 @@ func createStructList(cursor, parent clang.Cursor) {
 			structLists.Root[cursorname] = node
 			structLists.Root[fmt.Sprintf("struct %s", cursorname)] = node
 		}
-
 	} else if decl == clang.Cursor_FieldDecl && pdecl == clang.Cursor_StructDecl {
 		// fmt.Printf(" decl == clang.Cursor_FieldDecl && pdecl == clang.Cursor_StructDecl \n")
 		if len(structStack) != 0 {
 			node := structStack[len(structStack)-1]
 			if cutUSR(usr) == strings.Split(node.FieldType, "@@@")[0] {
 				// fmt.Printf("cutUSR(usr) == strings.Split(node.FieldType, `@@@`)[0]\n")
-				//fmt.Printf("struct element %s\n", strings.Split(node.FieldType, "@@@")[1])
+				// fmt.Printf("struct element %s\n", strings.Split(node.FieldType, "@@@")[1])
 				node.Add(cursorname, cursortype, "", node.FieldType)
 			} else {
+				// fmt.Printf("pcursorname %s\n", pcursorname)
 				// fmt.Printf("node.FieldType %s\n", node.FieldType)
 				// fmt.Printf("struct element %v\n", strings.Split(node.FieldType, "@@@"))
 				if pcursorname == "" {
-					childnode := structStack[len(structStack)-1]
-					structStack = structStack[0 : len(structStack)-1]
-					node := structStack[len(structStack)-1]
-					node.Add(cursorname, childnode.FieldType, "", node.FieldType)
+					structLists.Root[pcursortype].Add(cursorname, node.FieldType, "", node.FieldType)
 				} else if strings.Contains(cursortype, "anonymous struct") {
 					childnode := structStack[len(structStack)-1]
 					node = structLists.Root[pcursorname]
@@ -343,9 +348,6 @@ func getFunc(cursor, parent clang.Cursor) {
 		// fmt.Printf("hash %d\n ", currentFunctionHash)
 		info := getFunctionInfo(cursor, parent)
 		function := NewFunction(cursor.HashCursor(), cursor.Spelling(), info)
-		if functionTree == nil {
-			functionTree = NewFunctionTree()
-		}
 		functionTree.AddFunction(function)
 		// fmt.Printf("function %+v\n parent %d\n", function, parent.HashCursor())
 	}

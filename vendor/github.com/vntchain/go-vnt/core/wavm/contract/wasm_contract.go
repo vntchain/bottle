@@ -22,7 +22,6 @@ import (
 	"github.com/vntchain/go-vnt/core/vm/interface"
 
 	"github.com/vntchain/go-vnt/common"
-	"github.com/vntchain/go-vnt/log"
 )
 
 type WasmCode struct {
@@ -35,7 +34,7 @@ type WASMContractRef interface {
 	Address() common.Address
 }
 
-// Contract represents an ethereum contract in the state database. It contains
+// Contract represents an VNTChain contract in the state database. It contains
 // the the contract code, calling arguments. Contract implements ContractRef
 type WASMContract struct {
 	// CallerAddress is the result of the caller which initialised this
@@ -59,7 +58,7 @@ type WASMContract struct {
 	DelegateCall bool
 }
 
-// NewWASMContract returns a new contract environment for the execution of EVM.
+// NewWASMContract returns a new contract environment for the execution of WAVM.
 func NewWASMContract(caller WASMContractRef, object WASMContractRef, value *big.Int, gas uint64) *WASMContract {
 	c := &WASMContract{CallerAddress: caller.Address(), caller: caller, self: object, Args: nil}
 
@@ -69,8 +68,6 @@ func NewWASMContract(caller WASMContractRef, object WASMContractRef, value *big.
 	c.GasLimit = gas
 	// ensures a value is set
 	c.value = value
-
-	log.Debug("NewWASMContract", "gas", gas)
 
 	return c
 }
@@ -107,13 +104,10 @@ func (c *WASMContract) Caller() common.Address {
 
 // UseGas attempts the use gas and subtracts it and returns true on success
 func (c *WASMContract) UseGas(gas uint64) (ok bool) {
-	log.Debug("wasm_contract", "************", "************", "pre gas", c.Gas, "************", "************")
-	log.Debug("wasm_contract", "************", "************", "use gas", gas, "************", "************")
 	if c.Gas < gas {
 		return false
 	}
 	c.Gas -= gas
-	log.Debug("wasm_contract", "************", "************", "current gas", c.Gas, "************", "************")
 	return true
 }
 

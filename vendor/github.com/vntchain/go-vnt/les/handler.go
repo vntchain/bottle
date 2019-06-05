@@ -369,7 +369,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrMsgTooLarge, "%v > %v", size, ProtocolMaxMsgSize)
 	}
 
-	// yhx -- 按理说，新版的协议处理方式，不会有残留数据得不到处理
+	//-- 按理说，新版的协议处理方式，不会有残留数据得不到处理
 	//defer msg.Discard()
 
 	var deliverMsg *Msg
@@ -1191,7 +1191,7 @@ func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
 // NodeInfo represents a short summary of the VNT sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct {
-	Network    uint64              `json:"network"`    // VNT network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
+	Network    uint64              `json:"network"`    // VNT network ID (1=Frontier)
 	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's blockchain
 	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
 	Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules

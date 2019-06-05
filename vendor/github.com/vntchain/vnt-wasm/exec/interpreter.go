@@ -18,20 +18,21 @@ type Interpreter struct {
 	Mutable          *bool
 }
 
-func NewInterpreter(module *wasm.Module, compiled []vnt.Compiled, initMem func(m *vnt.WavmMemory, module *wasm.Module) error) (*Interpreter, error) {
+func NewInterpreter(module *wasm.Module, compiled []vnt.Compiled, initMem func(m *vnt.WavmMemory, module *wasm.Module) error, captureOp func(pc uint64, op byte) error, captureEnvFunctionStart func(pc uint64, name string) error, captureEnvFunctionEnd func(pc uint64, name string) error, debug bool) (*Interpreter, error) {
 	var inter Interpreter
 	var vm VM
-
+	vm.captureOp = captureOp
+	vm.captureEnvFunctionStart = captureEnvFunctionStart
+	vm.captureEnvFunctionEnd = captureEnvFunctionEnd
+	vm.debug = debug
 	inter.Memory = vnt.NewWavmMemory()
 	inter.heapPointerIndex = -1
 	mut := false
 	inter.Mutable = &mut
-
 	if module.Memory != nil && len(module.Memory.Entries) != 0 {
 		if len(module.Memory.Entries) > 1 {
 			return nil, ErrMultipleLinearMemories
 		}
-
 		vm.memory = make([]byte, uint(module.Memory.Entries[0].Limits.Initial)*wasmPageSize)
 		copy(vm.memory, module.LinearMemoryIndexSpace[0])
 	} else {
@@ -146,6 +147,10 @@ func NewInterpreter(module *wasm.Module, compiled []vnt.Compiled, initMem func(m
 
 	inter.VM = &vm
 	return &inter, nil
+}
+
+func (inter *Interpreter) Pc() int64 {
+	return inter.ctx.pc
 }
 
 // ExecContractCode calls the function with the given index and arguments.

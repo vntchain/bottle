@@ -1,9 +1,24 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package vntp2p
 
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"sync"
 	"time"
 
@@ -11,6 +26,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	peer "github.com/libp2p/go-libp2p-peer"
 	routing "github.com/libp2p/go-libp2p-routing"
+	"github.com/vntchain/go-vnt/log"
 )
 
 const (
@@ -23,6 +39,7 @@ type DhtTable interface {
 	Lookup(ctx context.Context, targetID NodeID) []*NodeID
 	Update(ctx context.Context, id peer.ID) error
 	RandomPeer() []peer.ID
+	GetDhtTable() *dht.IpfsDHT
 }
 
 type VNTDht struct {
@@ -39,10 +56,25 @@ func NewDHTTable(dht *dht.IpfsDHT, id peer.ID) *VNTDht {
 }
 
 func (vdht *VNTDht) Start(ctx context.Context) error {
-	// init
+	var bootStrapConfig = dht.DefaultBootstrapConfig
+	bootStrapConfig.Period = time.Duration(refreshInterval)
+	bootStrapConfig.Timeout = time.Duration(searchTimeOut)
+	proc, err := vdht.table.BootstrapWithConfig(bootStrapConfig)
+	if err != nil {
+		log.Debug("Start refresh k-bucket error", "error", err)
+		return err
+	}
 
-	// loop
-	go vdht.loop(ctx)
+	// wait till ctx or dht.Context exits.
+	// we have to do it this way to satisfy the Routing interface (contexts)
+	go func() {
+		defer proc.Close()
+		select {
+		case <-ctx.Done():
+		case <-vdht.table.Context().Done():
+		}
+	}()
+
 	return nil
 }
 
@@ -59,24 +91,6 @@ func randomID() peer.ID {
 	// var aid NodeID
 	// copy(aid, id)
 	return peer.ID(id)
-}
-
-func (vdht *VNTDht) loop(ctx context.Context) {
-	var (
-		refresh     = time.NewTicker(refreshInterval)
-		refreshDone = make(chan struct{})
-	)
-	go vdht.doRefresh(ctx, refreshDone)
-	// loop:
-	for {
-		// 开始搜寻
-
-		select {
-		case <-refresh.C:
-			go vdht.doRefresh(ctx, refreshDone)
-		}
-		// 刷新K桶
-	}
 }
 
 func (vdht *VNTDht) Lookup(ctx context.Context, targetID NodeID) []*NodeID {
@@ -101,17 +115,13 @@ func (vdht *VNTDht) lookup(ctx context.Context, targetid peer.ID) []peer.ID {
 	cctx, cancel := context.WithTimeout(ctx, searchTimeOut)
 	defer cancel()
 
-	var merr util.MultiErr
-
 	runQuery := func(ctxs context.Context, id peer.ID) {
 		p, err := vdht.table.FindPeer(ctxs, id)
 		if err == routing.ErrNotFound {
 		} else if err != nil {
-			merr = append(merr, err)
+			log.Debug("lookup peer occurs error", "error", err)
 		} else {
-			err := fmt.Errorf("Bootstrap peer error: Actually FOUND peer. (%s, %s)", id, p)
-			fmt.Println("Warning ", err)
-			merr = append(merr, err)
+			log.Debug("lookup peer find peer", "id", id.ToString(), "peer", p.ID.ToString())
 		}
 	}
 
@@ -147,4 +157,8 @@ func (vdht *VNTDht) doRefresh(ctx context.Context, done chan struct{}) {
 
 func (vdht *VNTDht) RandomPeer() []peer.ID {
 	return vdht.table.GetRandomPeers()
+}
+
+func (vdht *VNTDht) GetDhtTable() *dht.IpfsDHT {
+	return vdht.table
 }

@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package wavm
 
 import (
@@ -38,13 +54,37 @@ const FallBackPayableFunctionName = "$Fallback"
 type InvalidFunctionNameError string
 
 func (e InvalidFunctionNameError) Error() string {
-	return fmt.Sprintf("Invalid function name: %s", string(e))
+	return fmt.Sprintf("Exec wasm error: Invalid function name \"%s\"", string(e))
 }
 
 type InvalidPayableFunctionError string
 
 func (e InvalidPayableFunctionError) Error() string {
-	return fmt.Sprintf("Invalid payable function: %s", string(e))
+	return fmt.Sprintf("Exec wasm error: Invalid payable function: %s", string(e))
+}
+
+type IllegalInputError string
+
+func (e IllegalInputError) Error() string {
+	return fmt.Sprintf("Exec wasm error: Illegal input")
+}
+
+type UnknownABITypeError string
+
+func (e UnknownABITypeError) Error() string {
+	return fmt.Sprintf("Exec wasm error: Unknown abi type \"%s\"", e)
+}
+
+type UnknownTypeError string
+
+func (e UnknownTypeError) Error() string {
+	return fmt.Sprintf("Exec wasm error: Unknown type")
+}
+
+type NoFunctionError string
+
+func (e NoFunctionError) Error() string {
+	return fmt.Sprintf("Exec wasm error: Can't find function %s in abi", e)
 }
 
 type MismatchMutableFunctionError struct {
@@ -61,7 +101,7 @@ func (e MismatchMutableFunctionError) Error() string {
 	if e.current == 1 {
 		currentStr = "mutable"
 	}
-	return fmt.Sprintf("Mismatch mutable type , parent function type : %s , current function type : %s", parentStr, currentStr)
+	return fmt.Sprintf("Mismatch mutable type, parent function type : %s, current function type : %s", parentStr, currentStr)
 }
 
 type Wavm struct {
@@ -69,28 +109,21 @@ type Wavm struct {
 	Module          *wasm.Module
 	ChainContext    ChainContext
 	GasRules        gas.Gas
-	VmConfig        vm.Config
+	WavmConfig      Config
 	IsCreated       bool
 	currentFuncName string
 	MutableList     Mutable
+	tempGasLeft     uint64
 }
 
 // type InstanceContext struct {
 // 	memory *MemoryInstance
 // }
 
-type ActionName string
-
-const (
-	ActionNameInit  = "init"
-	ActionNameApply = "deploy"
-	ActionNameQuery = "query"
-)
-
-func NewWavm(chainctx ChainContext, vmconfig vm.Config, iscreated bool) *Wavm {
+func NewWavm(chainctx ChainContext, wavmConfig Config, iscreated bool) *Wavm {
 	return &Wavm{
 		ChainContext: chainctx,
-		VmConfig:     vmconfig,
+		WavmConfig:   wavmConfig,
 		IsCreated:    iscreated,
 	}
 }
@@ -99,6 +132,37 @@ func (wavm *Wavm) ResolveImports(name string) (*wasm.Module, error) {
 	envModule := EnvModule{}
 	envModule.InitModule(&wavm.ChainContext)
 	return envModule.GetModule(), nil
+}
+
+func (wavm *Wavm) captureOp(pc uint64, op byte) error {
+	if wavm.WavmConfig.Debug {
+		wavm.Tracer().CaptureState(wavm.ChainContext.Wavm, pc, OpCode{Op: op}, wavm.ChainContext.Contract.Gas, 0, nil, nil, wavm.ChainContext.Contract, wavm.ChainContext.Wavm.depth, nil)
+	}
+	return nil
+}
+
+func (wavm *Wavm) captureEnvFunctionStart(pc uint64, funcName string) error {
+	wavm.tempGasLeft = wavm.ChainContext.Contract.Gas
+	return nil
+}
+
+func (wavm *Wavm) captureEnvFunctionEnd(pc uint64, funcName string) error {
+	if wavm.WavmConfig.Debug {
+		gas := wavm.tempGasLeft - wavm.ChainContext.Contract.Gas
+		wavm.Tracer().CaptureState(wavm.ChainContext.Wavm, pc, OpCode{FuncName: funcName}, wavm.ChainContext.Contract.Gas, gas, nil, nil, wavm.ChainContext.Contract, wavm.ChainContext.Wavm.depth, nil)
+	}
+	return nil
+}
+
+func (wavm *Wavm) captrueFault(pc uint64, err error) error {
+	if wavm.WavmConfig.Debug {
+		wavm.Tracer().CaptureState(wavm.ChainContext.Wavm, pc, OpCode{FuncName: "error"}, wavm.ChainContext.Contract.Gas, 0, nil, nil, wavm.ChainContext.Contract, wavm.ChainContext.Wavm.depth, err)
+	}
+	return nil
+}
+
+func (wavm *Wavm) Tracer() vm.Tracer {
+	return wavm.ChainContext.Wavm.wavmConfig.Tracer
 }
 
 func instantiateMemory(m *vnt.WavmMemory, module *wasm.Module) error {
@@ -148,8 +212,6 @@ func (wavm *Wavm) InstantiateModule(code []byte, memory []uint8) error {
 		log.Error("could not read module", "err", err)
 		return err
 	}
-
-	//create需要验证，call不需要
 	if wavm.IsCreated == true {
 		err = validate.VerifyModule(m)
 		if err != nil {
@@ -168,22 +230,23 @@ func (wavm *Wavm) InstantiateModule(code []byte, memory []uint8) error {
 
 func (wavm *Wavm) Apply(input []byte, compiled []vnt.Compiled, mutable Mutable) (res []byte, err error) {
 	// Catch all the panic and transform it into an error
-	log.Debug("Wavm", "func", "apply")
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("Got error during wasm execution.", "err", r)
 			res = nil
 			err = fmt.Errorf("%s", r)
+			if wavm.WavmConfig.Debug == true {
+				if wavm.VM == nil {
+					wavm.captrueFault(uint64(0), err)
+				} else {
+					wavm.captrueFault(uint64(wavm.VM.Pc()), err)
+				}
+			}
 		}
 	}()
 	wavm.MutableList = mutable
-	vm, err := exec.NewInterpreter(wavm.Module, compiled, instantiateMemory)
-	if err != nil {
-		log.Error("could not create VM: ", "error", err)
-		return nil, err
-	}
 
-	//initialize the gas cost for initial memory when create contract
+	//initialize the gas cost for initial memory when create contract before create Interpreter
 	//todo memory grow内存消耗
 	if wavm.ChainContext.IsCreated == true {
 		memSize := uint64(1)
@@ -191,6 +254,13 @@ func (wavm *Wavm) Apply(input []byte, compiled []vnt.Compiled, mutable Mutable) 
 			memSize = uint64(wavm.Module.Memory.Entries[0].Limits.Initial)
 		}
 		wavm.ChainContext.GasCounter.GasInitialMemory(memSize)
+	}
+
+	var vm *exec.Interpreter
+	vm, err = exec.NewInterpreter(wavm.Module, compiled, instantiateMemory, wavm.captureOp, wavm.captureEnvFunctionStart, wavm.captureEnvFunctionEnd, wavm.WavmConfig.Debug)
+	if err != nil {
+		log.Error("Could not create VM: ", "error", err)
+		return nil, fmt.Errorf("Could not create VM: %s", err)
 	}
 
 	wavm.VM = vm
@@ -201,16 +271,11 @@ func (wavm *Wavm) Apply(input []byte, compiled []vnt.Compiled, mutable Mutable) 
 	// }
 	//
 	// vm.Contract.Gas = adjustedGas
-	log.Debug("GAS", "NORMAL", wavm.ChainContext.Contract.Gas)
 
 	res, err = wavm.ExecCodeWithFuncName(input)
 	if err != nil {
-		log.Error("wavm", "call", err)
 		return nil, err
 	}
-
-	log.Debug("GAS", "GASLEFT", wavm.ChainContext.Contract.Gas)
-	log.Debug("======wavm======", "====res====", res)
 	return res, err
 }
 
@@ -230,12 +295,9 @@ func (wavm *Wavm) GetFallBackFunction() (int64, string) {
 }
 
 func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
-	log.Debug("VM", "func", ">>>ExecCodeWithFuncName", "input", input)
-	log.Debug("VM", "func", ">>>ExecCodeWithFuncName", "GasLimit", wavm.ChainContext.Contract.GasLimit, "Gas", wavm.ChainContext.Contract.Gas)
 	wavm.ChainContext.Wavm.depth++
 	defer func() { wavm.ChainContext.Wavm.depth-- }()
 	index := int64(0)
-	//foo(string,string)
 	matched := false
 	funcName := ""
 	VM := wavm.VM
@@ -253,20 +315,13 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 	} else {
 		//TODO: do optimization on function searching
 		if len(input) < 4 {
-			// //查找是否有fallback方法
-			// index, funcName = wavm.GetFallBackFunction()
-			// if index == -1 {
-			// 	return nil, fmt.Errorf("%s", "Illegal input")
-			// }
-			// // funcName = FallBackFunctionName
+			matched = false
 		} else {
 			sig := input[:4]
 			input = input[4:]
 			for name, e := range module.Export.Entries {
-				log.Debug("vm", "func", "ExecCodeWithFuncName", "sig", sig, "name", name)
 				if val, ok := Abi.Methods[name]; ok {
 					res := val.Id()
-					log.Debug("vm", "func", "ExecCodeWithFuncName", "sig", sig, "res", res)
 					if bytes.Equal(sig, res) {
 						matched = true
 						funcName = name
@@ -284,7 +339,6 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 		if index == -1 {
 			return nil, InvalidFunctionNameError(funcName)
 		}
-		// funcName = FallBackFunctionName
 	}
 
 	if wavm.payable(funcName) != true {
@@ -292,8 +346,6 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 			return nil, InvalidPayableFunctionError(funcName)
 		}
 	}
-
-	log.Debug("vm", "func", "ExecCodeWithFuncName", "funcName", funcName, "funcIndex", index)
 	wavm.currentFuncName = funcName
 	var method abi.Method
 	if wavm.ChainContext.IsCreated == true {
@@ -301,17 +353,15 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 	} else {
 		method = Abi.Methods[funcName]
 	}
-	log.Debug("vm", "funcName", funcName)
 	var args []uint64
 
 	// if funcName == InitFuntionName {
 	// 	input = vm.ChainContext.Input
 	// }
 
-	log.Debug("vm", "func", "Inputs", "len", len(method.Inputs), "input", input)
 	for i, v := range method.Inputs {
 		if len(input) < 32*(i+1) {
-			return nil, fmt.Errorf("%s", "Illegal input")
+			return nil, IllegalInputError("")
 		}
 		arg := input[(32 * i):(32 * (i + 1))]
 		switch v.Type.T {
@@ -346,13 +396,11 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 			args = append(args, res)
 		case abi.AddressTy:
 			addr := common.BytesToAddress(arg)
-			// log.Debug("vm", "func", "ExecCodeWithFuncName", "address", addr.Hex())
-			// log.Debug("vm", "func", "ExecCodeWithFuncName", "address", addr.Bytes())
 			idx := VM.Memory.SetBytes(addr.Bytes())
 			VM.AddHeapPointer(uint64(len(addr.Bytes())))
 			args = append(args, uint64(idx))
 		default:
-			return nil, fmt.Errorf("abi: unknown type %v", v.Type.T)
+			return nil, UnknownABITypeError(v.Type.String())
 		}
 	}
 	if wavm.ChainContext.IsCreated == true {
@@ -390,7 +438,6 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 	}
 
 	if val, ok := Abi.Methods[funcName]; ok {
-		log.Debug("Methods", "funcname", funcName, "value", val)
 		outputs := val.Outputs
 		if len(outputs) != 0 {
 			output := outputs[0].Type.T
@@ -411,12 +458,17 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 					mem := VM.Memory.GetPtr(res)
 					bigint := utils.GetU256(mem)
 					return abi.U256(bigint), nil
-				} else {
+				} else if output == abi.UintTy {
 					return abi.U256(new(big.Int).SetUint64(res)), nil
+				} else {
+					if outputs[0].Type.Size == 32 {
+						return abi.U256(big.NewInt(int64(int32(res)))), nil
+					} else {
+						return abi.U256(big.NewInt(int64(res))), nil
+					}
 				}
-
 			case abi.BoolTy:
-				if res == 1 {
+				if res != 0 {
 					return mat.PaddedBigBytes(common.Big1, 32), nil
 				}
 				return mat.PaddedBigBytes(common.Big0, 32), nil
@@ -425,13 +477,13 @@ func (wavm *Wavm) ExecCodeWithFuncName(input []byte) ([]byte, error) {
 				return common.LeftPadBytes(v, 32), nil
 			default:
 				//todo 所有类型处理
-				return nil, errors.New("unknown type")
+				return nil, UnknownTypeError("")
 			}
 		} else { //无返回类型
 			return utils.I32ToBytes(0), nil
 		}
 	}
-	return nil, fmt.Errorf("can't find entrypoint %s in abi", funcName)
+	return nil, NoFunctionError(funcName)
 }
 
 func (wavm *Wavm) GetFuncName() string {

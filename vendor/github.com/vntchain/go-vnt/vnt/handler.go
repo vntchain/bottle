@@ -52,10 +52,6 @@ const (
 	txChanSize = 4096
 )
 
-var (
-	daoChallengeTimeout = 15 * time.Second // Time allowance for a node to reply to the DAO handshake challenge
-)
-
 // errIncompatibleConfig is returned if the requested protocols and configs are
 // not compatible (low protocol version restrictions and high requirements).
 var errIncompatibleConfig = errors.New("incompatible configuration")
@@ -98,6 +94,8 @@ type ProtocolManager struct {
 	// wait group is used for graceful shutdowns during downloading
 	// and processing
 	wg sync.WaitGroup
+
+	urlsCh chan []string // 传递p2p urls of witnesses
 }
 
 // NewProtocolManager returns a new VNT sub protocol manager. The VNT sub protocol manages peers capable
@@ -116,6 +114,8 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		txsyncCh:    make(chan *txsync),
 		quitSync:    make(chan struct{}),
 		node:        node,
+
+		urlsCh: make(chan []string),
 	}
 	// Figure out whether to allow fast sync or not
 	if mode == downloader.FastSync && blockchain.CurrentBlock().NumberU64() > 0 {
@@ -250,6 +250,8 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	go pm.minedBroadcastLoop()
 	go pm.bftBroadcastLoop()
 
+	go pm.resetBftPeerLoop()
+
 	// start sync handlers
 	go pm.syncer()
 	go pm.txsyncLoop()
@@ -263,6 +265,8 @@ func (pm *ProtocolManager) Stop() {
 	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
 	pm.bftMsgSub.Unsubscribe()
 	pm.bftPeerSub.Unsubscribe()
+
+	close(pm.urlsCh)
 
 	// Quit the sync loop.
 	// After this send has completed, no new peers will be accepted.
@@ -328,25 +332,6 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	// after this will be sent via broadcasts.
 	pm.syncTransactions(p)
 
-	// If we're DAO hard-fork aware, validate any remote peer with regard to the hard-fork
-	if daoBlock := pm.chainconfig.DAOForkBlock; daoBlock != nil {
-		// Request the peer's DAO fork header for extra-data validation
-		if err := p.RequestHeadersByNumber(daoBlock.Uint64(), 1, 0, false); err != nil {
-			return err
-		}
-		// Start a timer to disconnect if the peer doesn't reply in time
-		p.forkDrop = time.AfterFunc(daoChallengeTimeout, func() {
-			p.Log().Debug("Timed out DAO fork-check, dropping")
-			pm.removePeer(p.id)
-		})
-		// Make sure it's cleaned up if the peer dies off
-		defer func() {
-			if p.forkDrop != nil {
-				p.forkDrop.Stop()
-				p.forkDrop = nil
-			}
-		}()
-	}
 	// main loop. handle incoming messages.
 	for {
 		if err := pm.handleMsg(p); err != nil {
@@ -369,7 +354,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrMsgTooLarge, "%v > %v", size, ProtocolMaxMsgSize)
 	}
 
-	// yhx -- 按理说，新版的协议处理方式，不会有残留数据得不到处理
+	//按理说，新版的协议处理方式，不会有残留数据得不到处理
 	//defer msg.Discard()
 
 	// Handle the message depending on its contents
@@ -471,26 +456,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		var headers []*types.Header
 		if err := msg.Decode(&headers); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		// If no headers were received, but we're expending a DAO fork check, maybe it's that
-		if len(headers) == 0 && p.forkDrop != nil {
-			// Possibly an empty reply to the fork header checks, sanity check TDs
-			verifyDAO := true
-
-			// If we already have a DAO header, we can check the peer's TD against it. If
-			// the peer's ahead of this, it too must have a reply to the DAO check
-			if daoHeader := pm.blockchain.GetHeaderByNumber(pm.chainconfig.DAOForkBlock.Uint64()); daoHeader != nil {
-				if _, td := p.Head(); td.Cmp(pm.blockchain.GetTd(daoHeader.Hash(), daoHeader.Number.Uint64())) >= 0 {
-					verifyDAO = false
-				}
-			}
-			// If we're seemingly on the same chain, disable the drop timer
-			if verifyDAO {
-				p.Log().Debug("Seems to be on the same side of the DAO fork")
-				p.forkDrop.Stop()
-				p.forkDrop = nil
-				return nil
-			}
 		}
 		// Filter out any explicitly requested headers, deliver the rest to the downloader
 		filter := len(headers) == 1
@@ -787,13 +752,21 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 func (pm *ProtocolManager) BroadcastBftMsg(bftMsg types.BftMsg) {
 	peers := pm.peers.PeersForBft()
 	log.Trace("BroadcastBftMsg", "type", bftMsg.BftType, "hash", bftMsg.Msg.Hash(), "number of bft peer", len(peers))
-	for _, peer := range peers {
-		log.Trace("BroadcastBftMsg", "to peer", peer.id.ToString())
-		err := peer.SendBftMsg(bftMsg)
-		if err != nil {
-			log.Error("BroadcastBftMsg ", "to peer", peer.id.ToString(), "error", err)
-		}
+
+	for _, p := range peers {
+		// using goroutine for each peer for peer may connection
+		go func(p *peer) {
+			log.Trace("BroadcastBftMsg", "to peer", p.id.ToString())
+			err := p.SendBftMsg(bftMsg)
+			if err != nil {
+				log.Error("BroadcastBftMsg error", "to peer", p.id.ToString(), "error", err)
+			} else {
+				log.Trace("BroadcastBftMsg success", "to peer", p.id.ToString())
+			}
+		}(p)
 	}
+
+	log.Trace("BroadcastBftMsg exit")
 }
 
 // Mined broadcast loop
@@ -828,7 +801,6 @@ func (pm *ProtocolManager) bftBroadcastLoop() {
 			pm.BroadcastBftMsg(ev.BftMsg) // First propagate block to peers
 		}
 	}
-
 }
 
 func (pm *ProtocolManager) bftPeerLoop() {
@@ -836,7 +808,8 @@ func (pm *ProtocolManager) bftPeerLoop() {
 		switch ev := obj.Data.(type) {
 		case core.BftPeerChangeEvent:
 			log.Trace("Receive BftPeerChangeEvent")
-			pm.resetBftPeer(ev.Urls) // First propagate block to peers
+			pm.urlsCh <- ev.Urls
+			// pm.resetBftPeer(ev.Urls) // First propagate block to peers
 		}
 	}
 }
@@ -844,7 +817,7 @@ func (pm *ProtocolManager) bftPeerLoop() {
 // NodeInfo represents a short summary of the VNT sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct {
-	Network    uint64              `json:"network"`    // VNT network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
+	Network    uint64              `json:"network"`    // VNT network ID (1=Frontier)
 	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's blockchain
 	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
 	Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules
@@ -860,5 +833,14 @@ func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 		Genesis:    pm.blockchain.Genesis().Hash(),
 		Config:     pm.blockchain.Config(),
 		Head:       currentBlock.Hash(),
+	}
+}
+
+func (pm *ProtocolManager) resetBftPeerLoop() {
+	log.Debug("resetBftPeerLoop start")
+	defer log.Debug("resetBftPeerLoop exit")
+
+	for urls := range pm.urlsCh {
+		pm.resetBftPeer(urls)
 	}
 }

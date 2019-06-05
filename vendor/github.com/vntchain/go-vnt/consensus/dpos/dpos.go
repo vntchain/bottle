@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package dpos
 
 import (
@@ -10,7 +26,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/vntchain/go-vnt/accounts"
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/common/math"
@@ -61,9 +77,6 @@ var (
 	// the previous block's timestamp + the minimum block period.
 	errInvalidTimestamp = errors.New("invalid timestamp")
 
-	// errUnauthorized is returned if a header is signed by a non-authorized entity.
-	errUnauthorized = errors.New("unauthorized")
-
 	// witness should be same with the parent
 	errWitnesses = errors.New("witnesses is different from parent")
 
@@ -86,13 +99,20 @@ type Dpos struct {
 	config         *params.DposConfig
 	bft            *BftManager
 	db             vntdb.Database // Database to store and retrieve dpos temp data, current not used
-	signatures     *lru.ARCCache  // Signatures of recent blocks to speed up mining
+	signatures     *lru.ARCCache  // Signatures of recent blocks to speed up block producing
 	signer         common.Address // VNT address of the signing key
 	signFn         SignerFn       // Signer function to authorize hashes with
 	lock           sync.RWMutex   // Protects the signer fields
 	updateInterval *big.Int       // Duration of update witnesses list
+	lastBounty     lastBountyInfo // 上次发放激励的信息
 
 	sendBftPeerUpdateFn func(urls []string)
+}
+
+type lastBountyInfo struct {
+	bountyHeight *big.Int // 上次发送激励的高度
+	updateHeight *big.Int // 更新当前数据的高度
+	sync.RWMutex          // 存在并发访问，加锁保护
 }
 
 // sigHash returns the hash which is used as input for the proof-of-authority
@@ -102,10 +122,10 @@ type Dpos struct {
 // Note, the method requires the extra data to be at least 65 bytes, otherwise it
 // panics. This is done to avoid accidentally using both forms (signature present
 // or not), which could be abused to produce different hashes for the same header.
-func sigHash(header *types.Header) (hash common.Hash) {
+func sigHash(header *types.Header) (hash common.Hash, err error) {
 	hasher := sha3.NewKeccak256()
 
-	rlp.Encode(hasher, []interface{}{
+	err = rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
 		header.Coinbase,
 		header.Root,
@@ -120,8 +140,12 @@ func sigHash(header *types.Header) (hash common.Hash) {
 		header.Extra,
 		header.Witnesses,
 	})
+	if err != nil {
+		return common.Hash{}, err
+	}
+
 	hasher.Sum(hash[:0])
-	return hash
+	return hash, nil
 }
 
 // ecrecover extracts the VNT account address from a signed header.
@@ -135,9 +159,13 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	signature := header.Signature
 
 	// Recover the public key and the VNT address
-	pubkey, err := crypto.Ecrecover(sigHash(header).Bytes(), signature)
+	sh, err := sigHash(header)
 	if err != nil {
 		return common.Address{}, err
+	}
+	pubkey, err := crypto.Ecrecover(sh.Bytes(), signature)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("ecrecover fialed: %s", err.Error())
 	}
 	var signer common.Address
 	copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
@@ -157,23 +185,17 @@ func New(config *params.DposConfig, db vntdb.Database) *Dpos {
 		db:             db,
 		signatures:     signatures,
 		updateInterval: nil,
+
+		lastBounty: lastBountyInfo{
+			bountyHeight: big.NewInt(0),
+			updateHeight: big.NewInt(0),
+		},
 	}
 
 	d.bft = newBftManager(d)
 	d.setUpdateInterval()
 
 	return d
-}
-
-// Fake dpos for tests
-func NewFaker() *Dpos {
-	cfg := &params.DposConfig{
-		WitnessesNum: 4,
-		Period:       2,
-	}
-
-	dp := New(cfg, nil)
-	return dp
 }
 
 func (d *Dpos) InitBft(sendBftMsg func(types.ConsensusMsg), SendPeerUpdate func(urls []string), verifyBlock func(*types.Block) (types.Receipts, []*types.Log, uint64, error), writeBlock func(*types.Block) error) {
@@ -187,7 +209,7 @@ func (d *Dpos) InitBft(sendBftMsg func(types.ConsensusMsg), SendPeerUpdate func(
 	// Init bft field
 	d.bft.coinBase = d.coinBase()
 
-	d.bft.miningStart()
+	d.bft.producingStart()
 }
 
 // Author implements consensus.Engine, returning the VNT address recovered
@@ -201,9 +223,9 @@ func (d *Dpos) VerifyHeader(chain consensus.ChainReader, header *types.Header, s
 
 	err := d.verifyHeader(chain, header, nil)
 	if err != nil {
-		log.Debug("VerifyHeader error", "hash", header.Hash(), "err", err.Error())
+		log.Debug("VerifyHeader error", "hash", header.Hash().String(), "err", err.Error())
 	} else {
-		log.Debug("VerifyHeader NO error", "hash", header.Hash(), "number", header.Number.Int64())
+		log.Debug("VerifyHeader NO error", "hash", header.Hash().String(), "number", header.Number.Int64())
 	}
 	return err
 }
@@ -335,12 +357,12 @@ func (d *Dpos) verifySeal(chain consensus.ChainReader, header *types.Header, par
 		return err
 	}
 
-	if bytes.Compare(signer.Bytes(), header.Coinbase.Bytes()) != 0 {
+	if signer != header.Coinbase {
 		return errInvalidCoinBase
 	}
 
 	// 确认轮次对不对，是不是该这个节点出块
-	if d.inTurn(header, signer, chain, parents) == false {
+	if !d.inTurn(header, signer, chain, parents) {
 		return errOutTurn
 	}
 	return nil
@@ -355,18 +377,18 @@ func (d *Dpos) VerifyWitnesses(header *types.Header, db *state.StateDB, parent *
 
 	// Check header.Extra
 	if needSetUpdateTime(updated, header.Number.Uint64()) {
-		if d.updatedWitnessCheckByTime(header) == false {
+		if !d.updatedWitnessCheckByTime(header) {
 			return fmt.Errorf("header.Extra is mismatch with header.Time when update")
 		}
 	} else {
-		if bytes.Compare(header.Extra, parent.Extra) != 0 {
+		if !bytes.Equal(header.Extra, parent.Extra) {
 			return fmt.Errorf("header.Extra is mismatch with parent.Time when NOT update")
 		}
 	}
 
 	// Check the witnesses list
 	for i := 0; i < len(localWitnesses); i++ {
-		if bytes.Compare(localWitnesses[i].Bytes(), header.Witnesses[i].Bytes()) != 0 {
+		if localWitnesses[i] != header.Witnesses[i] {
 			return fmt.Errorf("witnesses is not match")
 		}
 	}
@@ -422,7 +444,7 @@ func (d *Dpos) Prepare(chain consensus.ChainReader, header *types.Header) error 
 
 	// Make sure self is the current block producer before produce
 	witness := header.Coinbase
-	if d.inTurn(header, witness, chain, nil) == false {
+	if !d.inTurn(header, witness, chain, nil) {
 		log.Debug("Prepare failed", "err", errOutTurn)
 		return fmt.Errorf("node is out of turn")
 	}
@@ -454,7 +476,7 @@ func (d *Dpos) Finalize(chain consensus.ChainReader, header *types.Header, state
 	}
 
 	// Commit db
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.Root = state.IntermediateRoot(true)
 
 	// Assemble and return the final block for sealing
 	return types.NewBlock(header, txs, receipts), nil
@@ -485,11 +507,9 @@ func (d *Dpos) grantingReward(chain consensus.ChainReader, header *types.Header,
 
 			// the amount of bounty granted must not greater than the left bounty
 			actualBonus := math.BigMin(allBonus, restBounty)
+			log.Debug("Vote bounty", "each bounty(wei)", actualBonus.String())
 			if bonus := d.calcVoteBounty(candis, actualBonus); bonus != nil {
-				if err = election.AddCandidatesBounty(state, bonus); err != nil {
-					return err
-				}
-				election.GrantBounty(state, actualBonus)
+				return election.AddCandidatesBounty(state, bonus, actualBonus)
 			}
 		}
 	}
@@ -523,7 +543,11 @@ func (d *Dpos) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan
 	d.lock.RUnlock()
 
 	// Sign all the things without Signature
-	sighash, err := signFn(accounts.Account{Address: witness}, sigHash(header).Bytes())
+	sh, err := sigHash(header)
+	if err != nil {
+		return nil, err
+	}
+	sighash, err := signFn(accounts.Account{Address: witness}, sh.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -584,12 +608,12 @@ func (d *Dpos) inTurn(header *types.Header, witness common.Address, chain consen
 	)
 
 	getHeaderFromParents := func(hash common.Hash, num uint64) *types.Header {
-		if parents == nil || len(parents) == 0 {
+		if len(parents) == 0 {
 			return nil
 		}
 
 		for i := len(parents) - 1; i >= 0; i-- {
-			if bytes.Compare(parents[i].Hash().Bytes(), hash.Bytes()) == 0 && parents[i].Number.Uint64() == num {
+			if parents[i].Hash() == hash && parents[i].Number.Uint64() == num {
 				return parents[i]
 			}
 		}
@@ -628,7 +652,7 @@ func (d *Dpos) previousWitness(manager *Manager, chain consensus.ChainReader, ha
 	var header *types.Header
 
 	find := false
-	for find == false {
+	for !find {
 		if number == 0 {
 			return witness, produceTime, errNoPreviousWitness
 		}
@@ -644,7 +668,7 @@ func (d *Dpos) previousWitness(manager *Manager, chain consensus.ChainReader, ha
 		// check is witness still valid
 		witness = header.Coinbase
 		find = manager.has(witness)
-		if find == true {
+		if find {
 			break
 		}
 
@@ -712,7 +736,7 @@ func (d *Dpos) getWitnesses(header *types.Header, db *state.StateDB, parent *typ
 
 	// Using parent's witnesses, when update failed or No need update
 	updated := need
-	if witnesses == nil || len(witnesses) == 0 {
+	if len(witnesses) == 0 {
 		witnesses = parent.Witnesses
 		updated = false
 	}
@@ -736,10 +760,7 @@ func (d *Dpos) GetWitnessesFromStateDB(stateDB *state.StateDB) ([]common.Address
 func (d *Dpos) needUpdateWitnesses(t *big.Int, lastUpdateTime *big.Int) bool {
 	log.Debug("needUpdateWitnesses", "last", lastUpdateTime.String(), "current", t.String())
 	dur := new(big.Int).Sub(t, lastUpdateTime)
-	if dur.Cmp(d.updateInterval) >= 0 {
-		return true
-	}
-	return false
+	return dur.Cmp(d.updateInterval) >= 0
 }
 
 // setUpdateInterval only called when start up
@@ -768,8 +789,8 @@ func (d *Dpos) VerifyCommitMsg(block *types.Block) error {
 	return d.bft.VerifyCmtMsgOf(block)
 }
 
-func (d *Dpos) MiningStop() {
-	d.bft.miningStop()
+func (d *Dpos) ProducingStop() {
+	d.bft.producingStop()
 }
 
 type updateTime [updateTimeLen]byte
@@ -792,7 +813,7 @@ func (d *Dpos) calcVoteBounty(candis election.CandidateList, allBonus *big.Int) 
 	totalVotes := big.NewInt(0)
 	activeCnt := 0
 	for _, can := range candis {
-		if can.Active == false {
+		if !can.Active {
 			continue
 		}
 		totalVotes.Add(totalVotes, can.VoteCount)
@@ -806,7 +827,7 @@ func (d *Dpos) calcVoteBounty(candis election.CandidateList, allBonus *big.Int) 
 	// Calc each candidates' bonus
 	bonus := make(map[common.Address]*big.Int, activeCnt)
 	for _, can := range candis {
-		if can.Active == false {
+		if !can.Active {
 			continue
 		}
 
@@ -838,8 +859,12 @@ func (d *Dpos) voteBonusPreWork(chain consensus.ChainReader, header *types.Heade
 
 	// Calc all vote bonus
 	// the last block number of calculate vote reward is the last block number of updating witness list
-	lastCalcBountyBlkNr := d.lastBountyBlkNr(bc)
+	lastCalcBountyBlkNr := d.lastBountyBlkNr(header, bc)
+	log.Debug("Bounus", "lastCalcBountyBlkNr", lastCalcBountyBlkNr.String())
 	allBonus := big.NewInt(0).Sub(header.Number, lastCalcBountyBlkNr)
+	if allBonus.Sign() <= 0 {
+		return make(election.CandidateList, 0), big.NewInt(0), nil
+	}
 	allBonus.Mul(allBonus, curHeightBonus(header.Number, VortexCandidatesBonus))
 
 	// Get all witnesses candidates
@@ -850,16 +875,39 @@ func (d *Dpos) voteBonusPreWork(chain consensus.ChainReader, header *types.Heade
 
 // lastBountyBlkNr returns the block number of last update witness list. Returns
 // the current block number if not find. This prevents excessive incentives.
-func (d *Dpos) lastBountyBlkNr(bc *core.BlockChain) *big.Int {
-	header := bc.CurrentHeader()
-	curHeader := header
-	for d.updatedWitnessCheckByTime(header) == false {
-		if header = bc.GetHeaderByHash(header.ParentHash); header == nil {
-			return new(big.Int).Set(curHeader.Number)
+// 见证人列表长时间未更新时，可能查找耗时，所以设置缓存数据，
+// 同过度的下次查找将不再耗时。
+// 不同高度的话，必然已经进行了下一轮见证人列表更新，以链上数据
+// 为准，所以进行查找，然后记录数据。
+func (d *Dpos) lastBountyBlkNr(header *types.Header, bc *core.BlockChain) (bh *big.Int) {
+	// 数据老旧时，尝试更新数据
+	d.lastBounty.RLock()
+	outdated := d.lastBounty.updateHeight.Cmp(header.Number) < 0
+	d.lastBounty.RUnlock()
+	if outdated {
+		h := bc.CurrentHeader()
+		for !d.updatedWitnessCheckByTime(h) && h != nil {
+			h = bc.GetHeaderByHash(h.ParentHash)
 		}
+		if h != nil {
+			bh = new(big.Int).Set(h.Number)
+		} else {
+			bh = new(big.Int).Set(header.Number)
+		}
+
+		d.lastBounty.Lock()
+		d.lastBounty.bountyHeight.Set(bh)
+		d.lastBounty.updateHeight.Set(header.Number)
+		d.lastBounty.Unlock()
+		return
 	}
 
-	return new(big.Int).Set(header.Number)
+	// 本高度已查找过，使用已查得数据
+	d.lastBounty.RLock()
+	bh = big.NewInt(0).Set(d.lastBounty.bountyHeight)
+	d.lastBounty.RUnlock()
+
+	return bh
 }
 
 // updatedWitnessCheckByTime using time to check whether this block updated
@@ -872,10 +920,7 @@ func (d *Dpos) updatedWitnessCheckByTime(header *types.Header) bool {
 	var upTime updateTime
 	copy(upTime[:], header.Extra[:updateTimeLen])
 	uTime := upTime.bigInt()
-	if uTime.Cmp(header.Time) == 0 {
-		return true
-	}
-	return false
+	return uTime.Cmp(header.Time) == 0
 }
 
 // curHeightBonus return the VNT bonus at blkNr block number.

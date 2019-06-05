@@ -26,14 +26,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/vntchain/go-vnt/common"
 	"github.com/vntchain/go-vnt/consensus"
 	"github.com/vntchain/go-vnt/core/rawdb"
 	"github.com/vntchain/go-vnt/core/types"
-	"github.com/vntchain/go-vnt/vntdb"
 	"github.com/vntchain/go-vnt/log"
 	"github.com/vntchain/go-vnt/params"
-	"github.com/hashicorp/golang-lru"
+	"github.com/vntchain/go-vnt/vntdb"
 )
 
 const (
@@ -142,19 +142,26 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	if ptd == nil {
 		return NonStatTy, consensus.ErrUnknownAncestor
 	}
-	localTd := hc.GetTd(hc.currentHeaderHash, hc.CurrentHeader().Number.Uint64())
+	curHeader := hc.CurrentHeader()
+	localTd := hc.GetTd(hc.currentHeaderHash, curHeader.Number.Uint64())
 	externTd := new(big.Int).Add(header.Difficulty, ptd)
 
 	// Irrelevant of the canonical status, write the td and header to the database
 	if err := hc.WriteTd(hash, number, externTd); err != nil {
 		log.Crit("Failed to write header total difficulty", "err", err)
 	}
+
+	// Not insert header in irreversible
+	if curHeader.Number.Uint64() > header.Number.Uint64() {
+		return NonStatTy, fmt.Errorf("header height is irreversible")
+	}
+
 	rawdb.WriteHeader(hc.chainDb, header)
 
-	// If the total difficulty is higher than our known, add it to the canonical chain
-	// Second clause in the if statement reduces the vulnerability to selfish mining.
-	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	if externTd.Cmp(localTd) > 0 || (externTd.Cmp(localTd) == 0 && mrand.Float64() < 0.5) {
+	headerIsCanon := func(header *types.Header) bool {
+		return header.Time.Cmp(curHeader.Time) < 0
+	}
+	if externTd.Cmp(localTd) > 0 || headerIsCanon(header) {
 		// Delete any canonical number assignments above the new head
 		for i := number + 1; ; i++ {
 			hash := rawdb.ReadCanonicalHash(hc.chainDb, i)

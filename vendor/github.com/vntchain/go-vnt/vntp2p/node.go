@@ -1,20 +1,31 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package vntp2p
 
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
-	// "errors"
 	"fmt"
-	// "github.com/vntchain/go-vnt/common"
-	// "github.com/vntchain/go-vnt/crypto"
-	peer "github.com/libp2p/go-libp2p-peer"
-	// "math/big"
 	"net"
 	"strconv"
 	"strings"
 
+	peer "github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
-	// "time"
 )
 
 // 包内都用peerID,对外方法使用NodeID
@@ -39,7 +50,7 @@ type Node struct {
 }
 
 func (n *Node) String() string {
-	return ""
+	return n.Addr.String() + "/ipfs/" + n.Id.ToString()
 }
 
 func NewNode(id peer.ID, ip net.IP, udpPort, tcpPort uint16) *Node {
@@ -75,6 +86,27 @@ func MustParseNode(rawurl string) *Node {
 		panic("invalid node URL: " + err.Error())
 	}
 	return n
+}
+
+// for toml unmarshal
+func (n *Node) UnmarshalText(data []byte) error {
+	var err error
+	var nd *Node
+
+	nd, err = ParseNode(string(data))
+	n.Addr = nd.Addr
+	n.Id = nd.Id
+
+	return err
+}
+
+// for toml marshal
+func (n *Node) MarshalText() ([]byte, error) {
+	url := n.String()
+	ret := make([]byte, len(url))
+	copy(ret, url)
+
+	return ret, nil
 }
 
 /* func PubkeyID(pub *ecdsa.PublicKey) NodeID {

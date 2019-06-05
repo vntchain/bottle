@@ -16,6 +16,8 @@
 
 package core
 
+import "sync"
+
 type ExportType int
 
 const (
@@ -57,7 +59,8 @@ type Function struct {
 }
 
 type FunctionTree struct {
-	Root map[uint32]*Function
+	Mutex *sync.RWMutex
+	Root  map[uint32]*Function
 }
 
 type CallFunction struct {
@@ -80,7 +83,8 @@ func NewFunction(hash uint32, name string, info FunctionInfo) *Function {
 
 func NewFunctionTree() *FunctionTree {
 	return &FunctionTree{
-		Root: map[uint32]*Function{},
+		Mutex: new(sync.RWMutex),
+		Root:  map[uint32]*Function{},
 	}
 }
 

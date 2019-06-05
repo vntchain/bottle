@@ -17,6 +17,7 @@
 package core
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"encoding/gob"
@@ -25,10 +26,13 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/dollarshaveclub/line"
 )
 
 type ContentPerLine struct {
@@ -150,6 +154,51 @@ func writeFile(file string, content []byte) error {
 	return os.Rename(f.Name(), file)
 }
 
+func unpackZip(dst string, src string, depth int) error {
+	reader, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	for _, file := range reader.File {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		split := strings.Split(file.Name, "/")
+		if len(split) <= depth {
+			continue
+		}
+		filename := path.Join(dst, strings.Join(split[depth:], "/"))
+		rc, err := file.Open()
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+		if err := writeFile(filename, nil); err != nil {
+			return err
+		}
+		f, err := os.OpenFile(filename, os.O_RDWR, os.ModePerm)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(f, rc)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func isEmpty(dir string) bool {
+	files, _ := ioutil.ReadDir(dir)
+	if len(files) == 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
 func isSupportedType(tp string) bool {
 	types := []string{"int32", "int64", "uint32", "uint64", "uint256", "string", "address", "bool", "_Bool", "void"}
 	typesmap := map[string]bool{}
@@ -193,4 +242,36 @@ func deployText(abi, code string) string {
    	 	}
  	})
 	`, abi, code)
+}
+
+func PrintfHeader(output *line.Line, format string, a ...interface{}) {
+	li := output.Prefix("")
+	li.Printf(format, a...)
+	li.Printf("%s\n", strings.Repeat("=", len(fmt.Sprintf(format, a...))))
+}
+
+func PrintfBody(output *line.Line, before string, after string) {
+	li := output.Prefix("   > ")
+	pad := rightPadBytes([]byte(before), 25)
+	text := fmt.Sprintf("%s%s\n", string(pad), after)
+	li.Printf("%s", text)
+}
+
+func rightPadBytes(slice []byte, l int) []byte {
+	if l <= len(slice) {
+		return slice
+	}
+	padded := []byte(strings.Repeat(" ", l))
+	copy(padded, slice)
+	return padded
+}
+
+// merges extraHeaders into headers and returns headers
+func merge(contract1, contrac2 Contract) Contract {
+	contract1.ContractName = contrac2.ContractName
+	contract1.Abi = contrac2.Abi
+	contract1.Bytecode = contrac2.Bytecode
+	contract1.SourcePath = contrac2.SourcePath
+	contract1.UpdatedAt = contrac2.UpdatedAt
+	return contract1
 }

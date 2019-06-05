@@ -29,10 +29,11 @@ import (
 // get wasmCeptionFlag and vntIncludeFlag from go install -ldflags "-X env.wasmCeptionFlag=xxx -X env.vntIncludeFlag=xxx"
 var wasmCeptionFlag string
 var vntIncludeFlag string
+var nodeFlag string
 var gitCommit string
 
 func main() {
-	app := core.NewApp(gitCommit, "the bottle command line interface", vntIncludeFlag, wasmCeptionFlag)
+	app := core.NewApp(gitCommit, "the bottle command line interface", vntIncludeFlag, wasmCeptionFlag, nodeFlag)
 	app.HideVersion = true // we have a command to print the version
 	app.Copyright = "Copyright 2018-2019 The bottle Authors"
 	app.Commands = []cli.Command{
@@ -41,6 +42,9 @@ func main() {
 		core.DecompressCmd,
 		core.HintCmd,
 		core.InitCmd,
+		core.BuildCmd,
+		core.MigrateCmd,
+		// core.ServerCmd,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 	if err := app.Run(os.Args); err != nil {

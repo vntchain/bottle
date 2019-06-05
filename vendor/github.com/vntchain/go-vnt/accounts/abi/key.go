@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package abi
 
 import (
@@ -53,7 +69,7 @@ type Root struct {
 type Node struct {
 	FieldName     string           `json:"name"`
 	FieldType     string           `json:"type"`
-	FieldLocation string           `json:"fieldlocation"`
+	FieldLocation string           `json:"-"`
 	StorageType   StorageType      `json:"storagetype"`
 	Children      map[string]*Node `json:"children"`
 	Tables        []*Node          `json:"tables"`
@@ -70,16 +86,24 @@ func NewNode(fieldname string, fieldtype string, fieldlocation string) *Node {
 }
 
 func (nd *Node) addchild(fieldname, fieldtype, fieldlocation, base string) *Node {
-	child, ok := nd.Children[base]
+	var child *Node
+	var ok bool
+	child, ok = nd.GetChildren(base)
 	if !ok {
 		child = NewNode(fieldname, fieldtype, fieldlocation)
 		nd.Children[fieldname] = child
 		if child.FieldName != "mapping1537182776" && child.FieldName != "array1537182776" {
 			nd.Tables = append(nd.Tables, child)
 		}
-
 	}
 	return child
+}
+
+func (nd *Node) GetChildren(name string) (*Node, bool) {
+	// nd.mu.Lock()
+	// defer nd.mu.Unlock()
+	child, ok := nd.Children[name]
+	return child, ok
 }
 
 func (nd *Node) Add(fieldname string, fieldtype string, fieldlocation string, base string) *Node {

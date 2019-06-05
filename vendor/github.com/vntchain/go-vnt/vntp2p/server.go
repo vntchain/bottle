@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package vntp2p
 
 import (
@@ -5,22 +21,20 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"net"
-	"sync"
-
-	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p"
 	p2phost "github.com/libp2p/go-libp2p-host"
 	inet "github.com/libp2p/go-libp2p-net"
 	protocol "github.com/libp2p/go-libp2p-protocol"
 	"github.com/vntchain/go-vnt/event"
 	"github.com/vntchain/go-vnt/log"
+	"net"
+	"sync"
 
 	// inet "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	ma "github.com/multiformats/go-multiaddr"
 	// kb "github.com/libp2p/go-libp2p-kbucket"
-	// "time"
 )
 
 const (
@@ -35,46 +49,30 @@ type dialFlag int
 const (
 	dynDialedDail dialFlag = 1 << iota
 	staticDialedDail
-	inboundDail
-	trustedDail
 )
 
 type Config struct {
-	PrivateKey *ecdsa.PrivateKey `toml:"-"`
-
-	MaxPeers int
-
+	PrivateKey      *ecdsa.PrivateKey `toml:"-"`
+	MaxPeers        int
 	MaxPendingPeers int `toml:",omitempty"`
-
-	DialRatio int `toml:",omitempty"`
-
-	NoDiscovery bool
-
-	Name string `toml:"-"`
+	DialRatio       int `toml:",omitempty"`
+	NoDiscovery     bool
+	Name            string `toml:"-"`
 
 	BootstrapNodes []*Node
+	StaticNodes    []*Node
+	TrustedNodes   []*Node
 
-	StaticNodes []*Node
-
-	TrustedNodes []*Node
-
-	NetRestrict []*net.IPNet `toml:",omitempty"`
-
-	NodeDatabase string `toml:",omitempty"`
-
-	Protocols []Protocol `toml:"-"`
-
-	ListenAddr string
-
-	NAT libp2p.Option `toml:",omitempty"`
-
+	NetRestrict  []*net.IPNet `toml:",omitempty"`
+	NodeDatabase string       `toml:",omitempty"`
+	Protocols    []Protocol   `toml:"-"`
+	ListenAddr   string
+	NAT          libp2p.Option `toml:"-"`
 	// Dialer NodeDialer `toml:"-"`
-
 	// NoDial bool `toml:",omitempty"`
 
 	EnableMsgEvents bool
-
-	Logger log.Logger `toml:",omitempty"`
+	Logger          log.Logger `toml:",omitempty"`
 }
 
 type Server struct {
@@ -118,17 +116,20 @@ type peerDrop struct {
 	requested bool // true if signaled by the peer
 }
 
+// close server.quit to broadcast the server shutdown
+func (server *Server) Close() {
+	log.Info("P2P server is being closed...")
+	close(server.quit)
+}
+
 func (server *Server) Start() error {
-	log.Info("yhx-test", "server.Protocols", server.Protocols)
+	log.Trace("P2P server starting...", "protocols", server.Protocols)
 	if server.running {
 		return errors.New("server already running")
 	}
 
 	server.lock.Lock()
 	defer server.lock.Unlock()
-
-	log.Info("server is Starting!")
-	// init
 
 	server.addpeer = make(chan *Stream)
 	server.delpeer = make(chan peerDrop)
@@ -150,14 +151,13 @@ func (server *Server) Start() error {
 	}
 
 	listenPort := server.Config.ListenAddr[1:]
-	log.Info("startVNTNode()", "listenPort", listenPort)
 	ctx, cancel := context.WithCancel(context.Background())
 	server.cancel = cancel
 
 	d := server.NodeDatabase
 	vdht, host, err := ConstructDHT(ctx, MakePort(listenPort), nil, d, server.Config.NetRestrict, server.Config.NAT)
 	if err != nil {
-		log.Error("startVNTNode()", "constructDHT error", err)
+		log.Error("ConstructDHT failed", "error", err)
 		return err
 	}
 
@@ -165,15 +165,14 @@ func (server *Server) Start() error {
 	// it can not hear response
 	host.SetStreamHandler(PID, server.HandleStream)
 
-	log.Info("startVNTNode()", "own nodeID", host.ID())
 	server.table = NewDHTTable(vdht, host.ID())
 	server.host = host
 
 	bootnodes := server.LoadConfig(ctx)
 
-	maxdails := server.maxDialedConns()
+	maxdials := server.maxDialedConns()
 
-	taskState := newTaskState(maxdails, bootnodes, server.table)
+	taskState := newTaskState(maxdials, bootnodes, server.table)
 
 	server.loopWG.Add(1)
 	go server.run(ctx, taskState)
@@ -189,7 +188,7 @@ func (server *Server) LoadConfig(ctx context.Context) []peer.ID {
 
 	for _, bootnode := range server.Config.BootstrapNodes {
 		server.host.Peerstore().AddAddrs(bootnode.Id, []ma.Multiaddr{bootnode.Addr}, peerstore.PermanentAddrTTL)
-		server.table.Update(ctx, bootnode.Id)
+		_ = server.table.Update(ctx, bootnode.Id)
 
 		bootnodes = append(bootnodes, bootnode.Id)
 	}
@@ -200,7 +199,7 @@ func (server *Server) LoadConfig(ctx context.Context) []peer.ID {
 
 func (server *Server) run(ctx context.Context, tasker taskworker) {
 	defer server.loopWG.Done()
-	server.table.Start(ctx)
+	_ = server.table.Start(ctx)
 	var (
 		runningTasks []task
 		queuedTasks  []task
@@ -244,20 +243,23 @@ func (server *Server) run(ctx context.Context, tasker taskworker) {
 
 		case t := <-server.addpeer:
 			remoteID := t.Conn.Conn().RemotePeer()
+			log.Debug("Adding peer", "peer id", remoteID)
 			if _, ok := peers[remoteID]; ok { // this peer already exists
 				break
 			}
-			p := newPeer(t)
+			p := newPeer(t, server)
 
 			if server.EnableMsgEvents {
 				p.events = &server.peerFeed
 			}
 			go server.runPeer(p)
 			peers[p.RemoteID()] = p
-			log.Info("yhx-test", "peers", peers)
+			log.Debug("Added peer", "peers", peers)
 
 		case t := <-server.addstatic:
+			log.Debug("Adding static", "peer id", t.Id)
 			tasker.addStatic(t)
+			log.Debug("Added static", "peer id", t.Id)
 		case t := <-server.removestatic:
 			tasker.removeStatic(t)
 			if p, ok := peers[t.Id]; ok {
@@ -271,9 +273,11 @@ func (server *Server) run(ctx context.Context, tasker taskworker) {
 
 		case pd := <-server.delpeer:
 			// A peer disconnected.
-			//log.Debug("Removing p2p peer", "peers", len(peers)-1, "req", "err", pd.err)
-			// fmt.Println("Del peer", pd.RemoteID())
-			delete(peers, pd.RemoteID())
+			pid := pd.RemoteID()
+			log.Info("Removing p2p peer", "peer", pid.ToString(), "error", pd.err)
+			if _, ok := peers[pid]; ok {
+				delete(peers, pid)
+			}
 		}
 	}
 }
@@ -281,24 +285,23 @@ func (server *Server) run(ctx context.Context, tasker taskworker) {
 func (server *Server) Stop() {
 	log.Info("Server is Stopping!")
 	defer server.cancel()
-	return
 }
 
 func (server *Server) AddPeer(ctx context.Context, node *Node) {
 
 	server.host.Peerstore().AddAddrs(node.Id, []ma.Multiaddr{node.Addr}, peerstore.PermanentAddrTTL)
-	server.table.Update(ctx, node.Id)
+	_ = server.table.Update(ctx, node.Id)
 
 	select {
-	case server.addstatic <- node:
 	case <-server.quit:
+	case server.addstatic <- node:
 	}
 }
 
 func (server *Server) RemovePeer(node *Node) {
 	select {
-	case server.removestatic <- node:
 	case <-server.quit:
+	case server.removestatic <- node:
 	}
 }
 
@@ -354,6 +357,7 @@ func (server *Server) GetPeerByRemoteID(s inet.Stream) *Peer {
 	}
 
 	select {
+	case <-server.quit:
 	case server.peerOp <- func(peers map[peer.ID]*Peer) {
 		remoteID := s.Conn().RemotePeer()
 		if val, ok := peers[remoteID]; ok {
@@ -361,11 +365,10 @@ func (server *Server) GetPeerByRemoteID(s inet.Stream) *Peer {
 		}
 	}:
 		<-server.peerOpDone
-	case <-server.quit:
 	}
 
 	pid := s.Conn().RemotePeer()
-	log.Info("yhx-test", "GetPeerByRemoteID peerid", pid, "peer got", p)
+	log.Debug("Got peer by remote id", "peerid", pid, "peer got", p)
 
 	return p
 }
@@ -373,13 +376,13 @@ func (server *Server) GetPeerByRemoteID(s inet.Stream) *Peer {
 func (server *Server) Peers() []*Peer {
 	var ps []*Peer
 	select {
+	case <-server.quit:
 	case server.peerOp <- func(peers map[peer.ID]*Peer) {
 		for _, p := range peers {
 			ps = append(ps, p)
 		}
 	}:
 		<-server.peerOpDone
-	case <-server.quit:
 	}
 	return ps
 }
@@ -387,9 +390,9 @@ func (server *Server) Peers() []*Peer {
 func (server *Server) PeerCount() int {
 	var count int
 	select {
+	case <-server.quit:
 	case server.peerOp <- func(ps map[peer.ID]*Peer) { count = len(ps) }:
 		<-server.peerOpDone
-	case <-server.quit:
 	}
 	return count
 }
@@ -402,8 +405,8 @@ func (server *Server) maxDialedConns() int {
 	return server.MaxPeers / r
 }
 
+// SetupStream 主动发起连接
 func (server *Server) SetupStream(ctx context.Context, target peer.ID, pid string) error {
-	// log.Info("yhx-test", "SetupStream target", target, "pid", pid)
 	s, err := server.host.NewStream(ctx, target, protocol.ID(pid))
 	if err != nil {
 		// fmt.Println("SetupStream NewStream Error: ", err)
@@ -413,7 +416,7 @@ func (server *Server) SetupStream(ctx context.Context, target peer.ID, pid strin
 	// handle response message
 	go server.HandleStream(s)
 	/* rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-	vntMessenger := &VNTMessenger{
+	vntMessenger := &VNTMsger{
 		protocol: Protocol{},
 		in:       make(chan Msg),
 		w:        rw,
@@ -457,9 +460,9 @@ func (server *Server) runPeer(p *Peer) {
 
 func (server *Server) dispatch(s *Stream, stage chan<- *Stream) error {
 	select {
-	case stage <- s:
 	case <-server.quit:
 		return errServerStopped
+	case stage <- s:
 	}
 	return nil
 }
@@ -482,7 +485,7 @@ func (server *Server) NodeInfo() *NodeInfo {
 
 	info := &NodeInfo{
 		ID:         node.Id.ToString(),
-		VNTNode:    node.Addr.String() + "/ipfs/" + node.Id.ToString(),
+		VNTNode:    node.String(),
 		Name:       server.Name,
 		IP:         GetIPfromAddr(node.Addr),
 		ListenAddr: server.ListenAddr,

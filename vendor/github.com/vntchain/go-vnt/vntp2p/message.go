@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package vntp2p
 
 import (
@@ -7,11 +23,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"sync/atomic"
 	"time"
 
+	inet "github.com/libp2p/go-libp2p-net"
 	"github.com/vntchain/go-vnt/log"
 	"github.com/vntchain/go-vnt/rlp"
-	inet "github.com/libp2p/go-libp2p-net"
 )
 
 type MsgReadWriter interface {
@@ -72,26 +89,10 @@ func (gmm *GoodMorningMsg) HandleMessage() error {
 	return nil
 }
 
-type msgHandler func() error
-
-/*func (mb *MsgBody) handleForMsgType() (msgHandler, error) {
-	switch mb.Type {
-	case GoodMorning:
-		gmm := &GoodMorningMsg{}
-		err := json.Unmarshal(mb.Payload, gmm)
-		if err != nil {
-			return nil, err
-		}
-		return gmm.HandleMessage, nil
-	default:
-		return nil, errors.New("invalid message type")
-	}
-}*/
-
 // Send is used to send message payload with specific messge type
 func Send(w MsgWriter, protocolID string, msgType MessageType, data interface{}) error {
 	// 还是要使用rlp进行序列化，因为类型多变，rlp已经有完整的支持
-	log.Info("yhx-test", "send message", data)
+	log.Info("Send message", "type", msgType)
 	size, r, err := rlp.EncodeToReader(data)
 	if err != nil {
 		log.Error("Send()", "rlp encode error", err)
@@ -147,45 +148,48 @@ func (msg *Msg) GetBodySize() uint32 {
 	return bodySize
 }
 
-// VNTMessenger vnt chain message readwriter
-type VNTMessenger struct {
+// VNTMsger vnt chain message readwriter
+type VNTMsger struct {
 	protocol Protocol
 	in       chan Msg
 	err      chan error
 	w        inet.Stream
+	peer     *Peer
 }
 
 // WriteMsg implement MsgReadWriter interface
-func (rw *VNTMessenger) WriteMsg(msg Msg) (err error) {
-	//if uint64(msg.Body.Type) >= rw.Length {
-	//	return newPeerError(errInvalidMsgCode, "not handled")
-	//}
-	// 暂时先不管主动关闭需要告知对方的情况，目前聚焦于发送消息这件基本工作
+func (rw *VNTMsger) WriteMsg(msg Msg) (err error) {
 	msgHeaderByte := msg.Header[:]
 	msgBodyByte, err := json.Marshal(msg.Body)
 	if err != nil {
-		log.Error("WriteMsg()", "marshal msgbody error", err)
+		log.Error("Write message", "marshal msgbody error", err)
 		return err
 	}
 	m := append(msgHeaderByte, msgBodyByte...)
-	//log.Info("yhx-test", "MESSAGE", string(m))
 
 	_, err = rw.w.Write(m)
 	if err != nil {
-		log.Error("WriteMsg()", "write msg error", err)
+		log.Error("Write message", "write msg error", err)
+		if atomic.LoadInt32(&rw.peer.reseted) == 0 {
+			log.Info("Write message", "underlay will close this connection which remotePID", rw.peer.RemoteID())
+			rw.peer.sendError(err)
+		}
+		log.Trace("Write message exit", "peer", rw.peer.RemoteID())
 		return err
 	}
 	return nil
 }
 
 // ReadMsg implement MsgReadWriter interface
-func (rw *VNTMessenger) ReadMsg() (Msg, error) {
+func (rw *VNTMsger) ReadMsg() (Msg, error) {
 	select {
 	case msg := <-rw.in:
-		log.Info("yhx-test", "incoming message", msg)
 		return msg, nil
 	case err := <-rw.err:
 		return Msg{}, err
+	case <-rw.peer.server.quit:
+		log.Info("P2P server is being closed, no longer read message...")
+		return Msg{}, errServerStopped
 	}
 }
 

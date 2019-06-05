@@ -38,12 +38,8 @@ import (
 // You should have received a copy of the GNU Lesser General Public License
 // along with the bottle library. If not, see <http://www.gnu.org/licenses/>.
 
-var structLists = abi.Root{
-	Root: make(map[string]*abi.Node),
-}
-var varLists = abi.Root{
-	Root: make(map[string]*abi.Node),
-}
+var structLists abi.Root
+var varLists abi.Root
 
 type value struct {
 	Path     string
@@ -61,13 +57,18 @@ type ValueSymbol struct {
 	ValueSymbol []symbol
 }
 
-var valueLists = make(map[string]value)
-var lengthLists = make(map[string]value)
-var keyLists = make(map[string]value)
-var structStack = []*abi.Node{}
-var root = NewKVTree()
+var valueLists map[string]value
+var lengthLists map[string]value
+var keyLists map[string]value
+var root *KVTree
+
+
 
 func initList(node map[string]*abi.Node) {
+	valueLists = make(map[string]value)
+	lengthLists = make(map[string]value)
+	keyLists = make(map[string]value)
+	root = NewKVTree()
 	for k, _ := range node {
 		s := strings.Split(k, ".")
 		keyLists[s[0]] = value{Path: s[0], TypeInfo: "pointer"}

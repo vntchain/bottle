@@ -1,3 +1,19 @@
+// Copyright 2019 The go-vnt Authors
+// This file is part of the go-vnt library.
+//
+// The go-vnt library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-vnt library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-vnt library. If not, see <http://www.gnu.org/licenses/>.
+
 package wavm
 
 import (
@@ -14,6 +30,7 @@ import (
 
 	"github.com/vntchain/go-vnt/accounts/abi"
 	"github.com/vntchain/go-vnt/common"
+	mat "github.com/vntchain/go-vnt/common/math"
 	"github.com/vntchain/go-vnt/core/types"
 	errormsg "github.com/vntchain/go-vnt/core/wavm/errors"
 	"github.com/vntchain/go-vnt/core/wavm/storage"
@@ -26,7 +43,13 @@ import (
 )
 
 var (
-	errExceededArray = errors.New("array length exceeded")
+	errExceededArray            = "array length exceeded"
+	errUnsupportType            = "unsupported type \"%s\""
+	errNoEvent                  = "event execution failed: there is no event '%s' in abi"
+	errEventArgsMismatch        = "event execution failed: expected event args number %d in abi, get args number %d"
+	errNoContractCall           = "contractCall execution failed: can not find call '%s' in abi"
+	errContractCallArgsMismatch = "contractCall execution failed: expected call args number %d in abi, get args number %d"
+	errContractCallResult       = "failed to get result in contract call"
 )
 
 var endianess = binary.LittleEndian
@@ -36,6 +59,7 @@ type EnvFunctions struct {
 	funcTable map[string]wasm.Function
 }
 
+//InitFuncTable init event and contract_call function
 func (ef *EnvFunctions) InitFuncTable(context *ChainContext) {
 	ef.ctx = context
 	ef.funcTable = ef.getFuncTable()
@@ -47,13 +71,21 @@ func (ef *EnvFunctions) InitFuncTable(context *ChainContext) {
 	for _, event := range ef.ctx.Abi.Events {
 		paramTypes := make([]wasm.ValueType, len(event.Inputs))
 		for index, input := range event.Inputs {
-			switch input.Type.String() {
-			case "uint64", "int64":
-				paramTypes[index] = wasm.ValueTypeI64
-			case "uint32", "int32", "address", "string", "bool", "uint256":
+			switch input.Type.T {
+			case abi.IntTy, abi.UintTy:
+				if input.Type.Size == 64 {
+					paramTypes[index] = wasm.ValueTypeI64
+				} else if input.Type.Size == 32 || input.Type.Size == 256 {
+					paramTypes[index] = wasm.ValueTypeI32
+				} else {
+					err := fmt.Errorf(errUnsupportType, input.Type.String())
+					panic(err)
+				}
+			case abi.AddressTy, abi.StringTy, abi.BoolTy:
 				paramTypes[index] = wasm.ValueTypeI32
 			default:
-				panic("unsupported type " + input.Type.String())
+				err := fmt.Errorf(errUnsupportType, input.Type.String())
+				panic(err)
 			}
 		}
 		//ef.funcTable[event.Name] = reflect.ValueOf(ef.getEvent(len(event.Inputs), event.Name))
@@ -76,24 +108,41 @@ func (ef *EnvFunctions) InitFuncTable(context *ChainContext) {
 		paramTypes[0] = wasm.ValueTypeI32
 		for index, input := range call.Inputs {
 			idx := index + 1
-			switch input.Type.String() {
-			case "uint64", "int64":
-				paramTypes[idx] = wasm.ValueTypeI64
-			case "uint32", "int32", "address", "string", "bool", "uint256":
+			switch input.Type.T {
+			case abi.IntTy, abi.UintTy:
+				if input.Type.Size == 64 {
+					paramTypes[idx] = wasm.ValueTypeI64
+				} else if input.Type.Size == 32 || input.Type.Size == 256 {
+					paramTypes[idx] = wasm.ValueTypeI32
+				} else {
+					err := fmt.Errorf(errUnsupportType, input.Type.String())
+					panic(err)
+				}
+			case abi.AddressTy, abi.StringTy, abi.BoolTy:
 				paramTypes[idx] = wasm.ValueTypeI32
 			default:
-				panic("unsupported type " + input.Type.String())
+				err := fmt.Errorf(errUnsupportType, input.Type.String())
+				panic(err)
 			}
+
 		}
 		returnTypes := make([]wasm.ValueType, len(call.Outputs))
 		for index, output := range call.Outputs {
-			switch output.Type.String() {
-			case "uint64", "int64":
-				returnTypes[index] = wasm.ValueTypeI64
-			case "uint32", "int32", "address", "string", "bool", "uint256":
+			switch output.Type.T {
+			case abi.IntTy, abi.UintTy:
+				if output.Type.Size == 64 {
+					returnTypes[index] = wasm.ValueTypeI64
+				} else if output.Type.Size == 32 || output.Type.Size == 256 {
+					returnTypes[index] = wasm.ValueTypeI32
+				} else {
+					err := fmt.Errorf(errUnsupportType, output.Type.String())
+					panic(err)
+				}
+			case abi.AddressTy, abi.StringTy, abi.BoolTy:
 				returnTypes[index] = wasm.ValueTypeI32
 			default:
-				panic("unsupported type " + output.Type.String())
+				err := fmt.Errorf(errUnsupportType, output.Type.String())
+				panic(err)
 			}
 		}
 		ef.funcTable[call.Name] = wasm.Function{
@@ -109,11 +158,12 @@ func (ef *EnvFunctions) InitFuncTable(context *ChainContext) {
 	}
 }
 
+//GetFuncTable get the env function table
 func (ef *EnvFunctions) GetFuncTable() map[string]wasm.Function {
 	return ef.funcTable
 }
 
-//todo uint64 =>uint256
+//GetBalanceFromAddress get balance from address
 func (ef *EnvFunctions) GetBalanceFromAddress(proc *exec.WavmProcess, locIndex uint64) uint64 {
 	ef.ctx.GasCounter.GasGetBalanceFromAddress()
 	ctx := ef.ctx
@@ -122,17 +172,19 @@ func (ef *EnvFunctions) GetBalanceFromAddress(proc *exec.WavmProcess, locIndex u
 	return ef.returnU256(proc, balance)
 }
 
+//GetBlockNumber get the block number
 func (ef *EnvFunctions) GetBlockNumber(proc *exec.WavmProcess) uint64 {
 	ef.ctx.GasCounter.GasGetBlockNumber()
 	return ef.ctx.BlockNumber.Uint64()
 }
 
+//GetGas get the rest gas
 func (ef *EnvFunctions) GetGas(proc *exec.WavmProcess) uint64 {
-	//当前剩余gas
 	ef.ctx.GasCounter.GasGetGas()
 	return ef.ctx.Contract.Gas
 }
 
+//GetBlockHash get the block hash
 func (ef *EnvFunctions) GetBlockHash(proc *exec.WavmProcess, blockNum uint64) uint64 {
 	ctx := ef.ctx
 	ctx.GasCounter.GasGetBlockHash()
@@ -143,11 +195,11 @@ func (ef *EnvFunctions) GetBlockHash(proc *exec.WavmProcess, blockNum uint64) ui
 		bhash := ctx.GetHash(num.Uint64())
 		return ef.returnHash(proc, []byte(bhash.Hex()))
 	} else {
-
 		return ef.returnHash(proc, []byte(common.Hash{}.Hex()))
 	}
 }
 
+//GetBlockProduser get the block produser address
 func (ef *EnvFunctions) GetBlockProduser(proc *exec.WavmProcess) uint64 {
 	ctx := ef.ctx
 	ctx.GasCounter.GasGetBlockProduser()
@@ -155,11 +207,13 @@ func (ef *EnvFunctions) GetBlockProduser(proc *exec.WavmProcess) uint64 {
 	return ef.returnAddress(proc, coinbase)
 }
 
+//GetTimestamp get the block timestamp
 func (ef *EnvFunctions) GetTimestamp(proc *exec.WavmProcess) uint64 {
 	ef.ctx.GasCounter.GasGetTimestamp()
 	return ef.ctx.Time.Uint64()
 }
 
+//GetOrigin get tx origin
 func (ef *EnvFunctions) GetOrigin(proc *exec.WavmProcess) uint64 {
 	ctx := ef.ctx
 	ctx.GasCounter.GasGetOrigin()
@@ -167,6 +221,7 @@ func (ef *EnvFunctions) GetOrigin(proc *exec.WavmProcess) uint64 {
 	return ef.returnAddress(proc, origin)
 }
 
+//GetSender get tx sender
 func (ef *EnvFunctions) GetSender(proc *exec.WavmProcess) uint64 {
 	ctx := ef.ctx
 	ctx.GasCounter.GasGetSender()
@@ -174,13 +229,14 @@ func (ef *EnvFunctions) GetSender(proc *exec.WavmProcess) uint64 {
 	return ef.returnAddress(proc, sender)
 }
 
+//GetGasLimit get the block gaslimit
 func (ef *EnvFunctions) GetGasLimit(proc *exec.WavmProcess) uint64 {
 	ctx := ef.ctx
 	ctx.GasCounter.GasGetGasLimit()
 	return ctx.GasLimit
 }
 
-//todo 不能转成uint64 必须是uint256
+//GetValue get tranfer vnt amount of a tx
 func (ef *EnvFunctions) GetValue(proc *exec.WavmProcess) uint64 {
 	ctx := ef.ctx
 	ctx.GasCounter.GasGetValue()
@@ -188,6 +244,7 @@ func (ef *EnvFunctions) GetValue(proc *exec.WavmProcess) uint64 {
 	return ef.returnU256(proc, val)
 }
 
+//SHA3
 func (ef *EnvFunctions) SHA3(proc *exec.WavmProcess, dataIdx uint64) uint64 {
 	data := proc.ReadAt(dataIdx)
 	ef.ctx.GasCounter.GasSHA3(uint64(len(data)))
@@ -195,6 +252,33 @@ func (ef *EnvFunctions) SHA3(proc *exec.WavmProcess, dataIdx uint64) uint64 {
 	return uint64(proc.SetBytes(hash))
 }
 
+//Ecrecover
+func (ef *EnvFunctions) Ecrecover(proc *exec.WavmProcess, hashptr uint64, sigv uint64, sigr uint64, sigs uint64) uint64 {
+	ef.ctx.GasCounter.GasEcrecover()
+	hash := proc.ReadAt(hashptr)
+	r := new(big.Int).SetBytes(proc.ReadAt(sigr))
+	s := new(big.Int).SetBytes(proc.ReadAt(sigs))
+	v := new(big.Int).SetUint64(sigv)
+	v = v.Sub(v, new(big.Int).SetUint64(27))
+	if v.Cmp(new(big.Int).SetUint64(0)) != 0 && v.Cmp(new(big.Int).SetUint64(1)) != 0 {
+		return ef.returnAddress(proc, []byte(""))
+	}
+	// tighter sig s values input homestead only apply to tx sigs
+	if !crypto.ValidateSignatureValues(v.Bytes()[0], r, s, false) {
+		return ef.returnAddress(proc, []byte(""))
+	}
+	// v needs to be at the end for libsecp256k1
+	pubKey, err := crypto.Ecrecover(hash, append(append(r.Bytes(), s.Bytes()...), v.Bytes()[0]))
+	// make sure the public key is a valid one
+	if err != nil {
+		return ef.returnAddress(proc, []byte(""))
+	}
+
+	// // the first byte of pubkey is bitcoin heritage
+	return ef.returnAddress(proc, common.LeftPadBytes(crypto.Keccak256(pubKey[1:])[12:], 32))
+}
+
+//GetContractAddress get contract address
 func (ef *EnvFunctions) GetContractAddress(proc *exec.WavmProcess) uint64 {
 	ctx := ef.ctx
 	ctx.GasCounter.GasGetContractAddress()
@@ -213,13 +297,13 @@ func (ef *EnvFunctions) Assert(proc *exec.WavmProcess, condition uint64, msgIdx 
 }
 
 func (ef *EnvFunctions) SendFromContract(proc *exec.WavmProcess, addrIdx uint64, amountIdx uint64) {
-	log.Debug("instructions", "func", "SendFromContract")
 	ef.forbiddenMutable(proc)
+	ef.ctx.GasCounter.GasSendFromContract()
 	addr := common.BytesToAddress(proc.ReadAt(addrIdx))
 	amount := utils.GetU256(proc.ReadAt(amountIdx))
 	if ef.ctx.CanTransfer(ef.ctx.StateDB, ef.ctx.Contract.Address(), amount) {
-		_, returnGas, err := ef.ctx.Wavm.Call(ef.ctx.Contract, addr, nil, params.CallStipend, amount)
-		ef.ctx.GasCounter.Charge(returnGas)
+		_, _, err := ef.ctx.Wavm.Call(ef.ctx.Contract, addr, nil, params.CallStipend, amount)
+		// ef.ctx.GasCounter.Charge(returnGas)
 		if err != nil {
 			panic(errormsg.ErrExecutionReverted)
 		}
@@ -229,14 +313,13 @@ func (ef *EnvFunctions) SendFromContract(proc *exec.WavmProcess, addrIdx uint64,
 }
 
 func (ef *EnvFunctions) TransferFromContract(proc *exec.WavmProcess, addrIdx uint64, amountIdx uint64) uint64 {
-	log.Debug("instructions", "func", "TransferFromContract")
 	ef.forbiddenMutable(proc)
-	// ef.ctx.GasCounter.GasSendFromContract()
+	ef.ctx.GasCounter.GasSendFromContract()
 	addr := common.BytesToAddress(proc.ReadAt(addrIdx))
 	amount := utils.GetU256(proc.ReadAt(amountIdx))
 	if ef.ctx.CanTransfer(ef.ctx.StateDB, ef.ctx.Contract.Address(), amount) {
-		_, returnGas, err := ef.ctx.Wavm.Call(ef.ctx.Contract, addr, nil, params.CallStipend, amount)
-		ef.ctx.GasCounter.Charge(returnGas)
+		_, _, err := ef.ctx.Wavm.Call(ef.ctx.Contract, addr, nil, params.CallStipend, amount)
+		// ef.ctx.GasCounter.Charge(returnGas)
 		if err != nil {
 			return 0
 		}
@@ -258,14 +341,14 @@ func (ef *EnvFunctions) fromU64(proc *exec.WavmProcess, amount uint64) uint64 {
 	return uint64(proc.SetBytes([]byte(str)))
 }
 
-func (ef *EnvFunctions) toI64(proc *exec.WavmProcess, strIdx uint64) int64 {
+func (ef *EnvFunctions) toI64(proc *exec.WavmProcess, strIdx uint64) uint64 {
 	ef.ctx.GasCounter.GasToI64()
 	b := proc.ReadAt(strIdx)
 	amount, err := strconv.Atoi(string(b))
 	if err != nil {
 		return 0
 	} else {
-		return int64(amount)
+		return uint64(amount)
 	}
 }
 
@@ -308,14 +391,14 @@ func (ef *EnvFunctions) getEvent(funcName string) interface{} {
 		var event abi.Event
 		var ok bool
 		if event, ok = Abi.Events[funcName]; !ok {
-			panic(fmt.Sprintf("event execution failed: there is no event '%s' in abi", funcName))
+			panic(fmt.Sprintf(errNoEvent, funcName))
 		}
 
 		abiParamLen := len(event.Inputs)
 		paramLen := len(vars)
 
 		if abiParamLen != paramLen {
-			panic(fmt.Sprintf("event execution failed: there is no event '%s' in abi", funcName))
+			panic(fmt.Sprintf(errEventArgsMismatch, abiParamLen, paramLen))
 		}
 
 		topics := make([]common.Hash, 0)
@@ -329,32 +412,41 @@ func (ef *EnvFunctions) getEvent(funcName string) interface{} {
 		for i := 0; i < paramLen; i++ {
 			input := event.Inputs[i]
 			indexed := input.Indexed
-			paramType := input.Type.String()
+			paramType := input.Type.T
 			param := vars[i]
 			var value []byte
 			switch paramType {
-			case "address":
+			case abi.AddressTy, abi.StringTy:
 				value = proc.ReadAt(param)
-			case "string":
-				value = proc.ReadAt(param)
-			case "uint64", "int64":
-				// value = abi.U256(new(big.Int).SetUint64(param))
-				value = make([]byte, 8)
-				binary.BigEndian.PutUint64(value, uint64(param))
-			case "uint32", "int32", "bool":
-				value = make([]byte, 4)
-				binary.BigEndian.PutUint32(value, uint32(param))
-			case "uint256":
-				// ef.readU256FromMemory(proc, param)
-				mem := proc.ReadAt(param)
-				value = abi.U256(utils.GetU256(mem))
+			case abi.UintTy, abi.IntTy:
+				if input.Type.Kind == reflect.Ptr {
+					mem := proc.ReadAt(param)
+					bigint := utils.GetU256(mem)
+					value = abi.U256(bigint)
+				} else if paramType == abi.UintTy {
+					value = abi.U256(new(big.Int).SetUint64(param))
+				} else {
+					if input.Type.Size == 32 {
+						value = abi.U256(big.NewInt(int64(int32(param))))
+					} else {
+						value = abi.U256(big.NewInt(int64(param)))
+					}
+				}
+			case abi.BoolTy:
+				if param == 1 {
+					value = mat.PaddedBigBytes(common.Big1, 32)
+				}
+				value = mat.PaddedBigBytes(common.Big0, 32)
 			}
 
 			if indexed {
+				if paramType == abi.StringTy {
+					value = crypto.Keccak256(value)
+				}
 				topic := common.BytesToHash(value)
 				topics = append(topics, topic)
 			} else {
-				if paramType == "string" {
+				if paramType == abi.StringTy {
 					strStartIndex = append(strStartIndex, len(data))
 					data = append(data, make([]byte, 32)...)
 					strData = append(strData, value)
@@ -378,7 +470,7 @@ func (ef *EnvFunctions) getEvent(funcName string) interface{} {
 			}
 		}
 
-		log.Debug("Will add event log: ", "topics", topics, "data", data)
+		log.Debug("Will add event log: ", "topics", topics, "data", data, "len", len(data))
 		ef.ctx.StateDB.AddLog(&types.Log{
 			Address:     ef.ctx.Contract.Address(),
 			Topics:      topics,
@@ -399,7 +491,7 @@ func (ef *EnvFunctions) getContractCall(funcName string) interface{} {
 	var dc abi.Method
 	var ok bool
 	if dc, ok = Abi.Calls[funcName]; !ok {
-		panic(fmt.Sprintf("call execution failed: Can not find call '%s' in abi", funcName))
+		panic(fmt.Sprintf(errNoContractCall, funcName))
 	}
 
 	fnDef := func(proc *exec.WavmProcess, vars ...uint64) interface{} {
@@ -407,44 +499,54 @@ func (ef *EnvFunctions) getContractCall(funcName string) interface{} {
 		abiParamLen := len(dc.Inputs)
 		paramLen := len(vars)
 		if abiParamLen+1 != paramLen {
-			panic(fmt.Sprintf("call execution failed: there is no such call '%s' in abi", funcName))
+			panic(fmt.Sprintf(errContractCallArgsMismatch, abiParamLen+1, paramLen))
 		}
 
 		args := []interface{}{}
 		for i := 1; i < paramLen; i++ {
 			input := dc.Inputs[i-1]
-			paramType := input.Type.String()
+			paramType := input.Type.T
 			param := vars[i]
 			var value []byte
-
 			switch paramType {
-			case "address":
+			case abi.AddressTy:
 				value = proc.ReadAt(param)
 				addr := common.BytesToAddress(value)
 				args = append(args, addr)
-			case "string":
+			case abi.StringTy:
 				value = proc.ReadAt(param)
 				args = append(args, string(value))
-			case "uint64":
-				args = append(args, uint64(param))
-			case "int64":
-				args = append(args, int64(param))
-			case "uint32":
-				args = append(args, uint32(param))
-			case "int32":
-				args = append(args, int32(param))
-			case "uint256":
-				mem := proc.ReadAt(param)
-				bigint := utils.GetU256(mem)
-				args = append(args, bigint)
-			case "bool":
+			case abi.IntTy:
+				if input.Type.Size == 32 {
+					args = append(args, int32(param))
+				} else if input.Type.Size == 64 {
+					args = append(args, int64(param))
+				} else {
+					err := fmt.Errorf(errUnsupportType, input.Type.String())
+					panic(err)
+				}
+			case abi.UintTy:
+				if input.Type.Size == 32 {
+					args = append(args, uint32(param))
+				} else if input.Type.Size == 64 {
+					args = append(args, uint64(param))
+				} else if input.Type.Size == 256 {
+					mem := proc.ReadAt(param)
+					bigint := utils.GetU256(mem)
+					args = append(args, bigint)
+				} else {
+					err := fmt.Errorf(errUnsupportType, input.Type.String())
+					panic(err)
+				}
+			case abi.BoolTy:
 				arg := false
 				if param == 1 {
 					arg = true
 				}
 				args = append(args, arg)
 			default:
-				panic("unsupport type " + paramType)
+				err := fmt.Errorf(errUnsupportType, input.Type.String())
+				panic(err)
 			}
 		}
 		var res []byte
@@ -475,8 +577,7 @@ func (ef *EnvFunctions) getContractCall(funcName string) interface{} {
 			gas += params.CallStipend
 		}
 		ret, returnGas, err := ef.ctx.Wavm.Call(ef.ctx.Contract, toAddr, res, gas, amount)
-		log.Debug("instructions", "func", "contractcall", "ret", ret, "gas", gas, "returnGas", returnGas, "err", err, "gasused", gas-returnGas)
-		failError := errors.New("failed to get result in contract call.")
+		failError := errors.New(errContractCallResult)
 		if err != nil {
 			e := fmt.Errorf("%s Reason : %s", failError, err)
 			panic(e)
@@ -486,57 +587,67 @@ func (ef *EnvFunctions) getContractCall(funcName string) interface{} {
 				return nil
 			} else {
 				t := dc.Outputs[0].Type
-				switch t.String() {
-				case "string":
+				switch t.T {
+				case abi.StringTy:
 					var unpackres string
 					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
 						panic(failError)
 					} else {
 						return uint32(proc.SetBytes([]byte(unpackres)))
 					}
-				case "address":
+				case abi.AddressTy:
 					var unpackres common.Address
 					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
 						panic(failError)
 					} else {
 						return uint32(proc.SetBytes(unpackres.Bytes()))
 					}
-				case "uint64":
-					var unpackres uint64
-					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
-						panic(failError)
+				case abi.UintTy:
+					if t.Size == 32 {
+						var unpackres uint32
+						if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
+							panic(failError)
+						} else {
+							return uint32(unpackres)
+						}
+					} else if t.Size == 64 {
+						var unpackres uint64
+						if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
+							panic(failError)
+						} else {
+							return uint64(unpackres)
+						}
+					} else if t.Size == 256 {
+						var unpackres *big.Int
+						if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
+							panic(failError)
+						} else {
+							return uint32(proc.SetBytes([]byte(unpackres.String())))
+						}
 					} else {
-						return uint64(unpackres)
+						err := fmt.Errorf(errUnsupportType, t.String())
+						panic(err)
 					}
-				case "int64":
-					var unpackres int64
-					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
-						panic(failError)
+				case abi.IntTy:
+					if t.Size == 32 {
+						var unpackres int32
+						if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
+							panic(failError)
+						} else {
+							return int32(unpackres)
+						}
+					} else if t.Size == 64 {
+						var unpackres int64
+						if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
+							panic(failError)
+						} else {
+							return int64(unpackres)
+						}
 					} else {
-						return int64(unpackres)
+						err := fmt.Errorf(errUnsupportType, t.String())
+						panic(err)
 					}
-				case "uint32":
-					var unpackres uint32
-					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
-						panic(failError)
-					} else {
-						return uint32(unpackres)
-					}
-				case "int32":
-					var unpackres int32
-					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
-						panic(failError)
-					} else {
-						return int32(unpackres)
-					}
-				case "uint256":
-					var unpackres *big.Int
-					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
-						panic(failError)
-					} else {
-						return uint32(proc.SetBytes([]byte(unpackres.String())))
-					}
-				case "bool":
+				case abi.BoolTy:
 					var unpackres bool
 					if err := Abi.Unpack(&unpackres, funcName, ret); err != nil {
 						panic(failError)
@@ -546,13 +657,12 @@ func (ef *EnvFunctions) getContractCall(funcName string) interface{} {
 						} else {
 							return int32(0)
 						}
-
 					}
 				default:
-					panic("unsupport type " + t.String())
+					err := fmt.Errorf(errUnsupportType, t.String())
+					panic(err)
 				}
 			}
-
 		}
 	}
 
@@ -578,19 +688,33 @@ func (ef *EnvFunctions) getContractCall(funcName string) interface{} {
 
 	if len(dc.Outputs) == 0 {
 		return funcVoid
-	} else {
-		switch dc.Outputs[0].Type.String() {
-		case "uint64":
-			return funcUint64
-		case "string", "address", "uint32", "uint256":
+	}
+	t := dc.Outputs[0].Type
+	switch t.T {
+	case abi.UintTy:
+		if t.Size == 32 {
 			return funcUint32
-		case "int64":
-			return funcInt64
-		case "int32":
-			return funcInt32
-		default:
+		} else if t.Size == 64 {
+			return funcUint64
+		} else if t.Size == 256 {
+			return funcUint32
+		} else {
 			return nil
 		}
+	case abi.IntTy:
+		if t.Size == 32 {
+			return funcInt32
+		} else if t.Size == 64 {
+			return funcInt64
+		} else {
+			return nil
+		}
+	case abi.StringTy, abi.AddressTy:
+		return funcUint32
+	case abi.BoolTy:
+		return funcInt32
+	default:
+		return nil
 	}
 
 	//return makeFunc(fnDef)
@@ -600,31 +724,45 @@ func (ef *EnvFunctions) getContractCall(funcName string) interface{} {
 func (ef *EnvFunctions) printLine(msg string) error {
 	funcName := ef.ctx.Wavm.Wavm.GetFuncName()
 	log.Info("Contract Debug >>>>", "func", funcName, "message", msg)
+	if ef.ctx.Wavm.wavmConfig.Debug == true && ef.ctx.Wavm.wavmConfig.Tracer != nil {
+		ef.ctx.Wavm.wavmConfig.Tracer.CaptureLog(nil, msg)
+	}
 	return nil
 }
 
-func (ef *EnvFunctions) GetPrintRemark(proc *exec.WavmProcess, remarkIdx uint64) string {
+func (ef *EnvFunctions) getPrintRemark(proc *exec.WavmProcess, remarkIdx uint64) string {
 	strValue := proc.ReadAt(remarkIdx)
 	return string(strValue)
 }
 
 // Print an Address
 func (ef *EnvFunctions) PrintAddress(proc *exec.WavmProcess, remarkIdx uint64, strIdx uint64) {
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
 	addrValue := proc.ReadAt(strIdx)
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), common.BytesToAddress(addrValue).String())
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), common.BytesToAddress(addrValue).String())
 	ef.printLine(msg)
 }
 
 // Print a string
 func (ef *EnvFunctions) PrintStr(proc *exec.WavmProcess, remarkIdx uint64, strIdx uint64) {
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
 	strValue := proc.ReadAt(strIdx)
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), string(strValue))
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), string(strValue))
 	ef.printLine(msg)
 }
 
 // Print a string
 func (ef *EnvFunctions) PrintQStr(proc *exec.WavmProcess, remarkIdx uint64, strIdx uint64) {
-
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
 	size := endianess.Uint32(proc.GetData()[strIdx : strIdx+4])
 	offset := endianess.Uint32(proc.GetData()[strIdx+4 : strIdx+8])
 	strValue := proc.GetData()[offset : offset+size]
@@ -632,40 +770,59 @@ func (ef *EnvFunctions) PrintQStr(proc *exec.WavmProcess, remarkIdx uint64, strI
 	if length > 128 {
 		length = 128
 	}
-	log.Debug("memory", "data", proc.GetData()[0:length])
-	log.Debug("PrintQStr", "remarkIdx", remarkIdx, "strIdx", strIdx, "offset", offset, "size", size, "data", strValue)
 	// msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), string(strValue))
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), hex.EncodeToString(strValue))
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), hex.EncodeToString(strValue))
 	ef.printLine(msg)
 }
 
 // Print a uint64
 func (ef *EnvFunctions) PrintUint64T(proc *exec.WavmProcess, remarkIdx uint64, intValue uint64) {
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), intValue)
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), intValue)
 	ef.printLine(msg)
 }
 
 // Print a uint32
 func (ef *EnvFunctions) PrintUint32T(proc *exec.WavmProcess, remarkIdx uint64, intValue uint64) {
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), uint32(intValue))
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), uint32(intValue))
 	ef.printLine(msg)
 }
 
-// Print a int64
+//PrintInt64T  Print a int64
 func (ef *EnvFunctions) PrintInt64T(proc *exec.WavmProcess, remarkIdx uint64, intValue uint64) {
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), int64(intValue))
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), int64(intValue))
 	ef.printLine(msg)
 }
 
-// Print a int32
+//PrintInt32T Print a int32
 func (ef *EnvFunctions) PrintInt32T(proc *exec.WavmProcess, remarkIdx uint64, intValue uint64) {
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), int32(intValue))
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), int32(intValue))
 	ef.printLine(msg)
 }
 
+//PrintUint256T Print a uint256
 func (ef *EnvFunctions) PrintUint256T(proc *exec.WavmProcess, remarkIdx uint64, idx uint64) {
+	if !ef.ctx.Wavm.wavmConfig.Debug {
+		return
+	}
+	ef.ctx.GasCounter.GasCostZero()
 	u256 := readU256FromMemory(proc, idx)
-	msg := fmt.Sprint(ef.GetPrintRemark(proc, remarkIdx), u256.String())
+	msg := fmt.Sprint(ef.getPrintRemark(proc, remarkIdx), u256.String())
 	ef.printLine(msg)
 }
 
@@ -751,13 +908,10 @@ func callStateDb(ef *EnvFunctions, proc *exec.WavmProcess, valAddr uint64, state
 	storageMap := ef.ctx.StorageMapping
 	if val, ok := storageMap[valAddr]; ok {
 		for _, v := range val.StorageKey {
-			log.Debug("env_funcs", "func", "callStateDb", "key", v, "keytype", v.KeyType)
 			var lengthKeyHash common.Hash
 			if v.IsArrayIndex {
 				lengthKeyHash = keyHash
-				log.Debug("callStateDb", "Is Array Index", "true")
 			} else {
-				log.Debug("callStateDb", "Is Array Index", "false")
 			}
 			keyMem := getMemory(proc, v.KeyAddress, v.KeyType, v.IsArrayIndex, getArrayLength(ef, lengthKeyHash))
 			if (keyHash == common.Hash{}) {
@@ -765,7 +919,6 @@ func callStateDb(ef *EnvFunctions, proc *exec.WavmProcess, valAddr uint64, state
 			} else {
 				keyHash = utils.MapLocation(keyHash.Bytes(), keyMem)
 			}
-			log.Debug("env_funcs", "func", "callStateDb", "keyhash", keyHash.String())
 		}
 		stateDbOp(val, keyHash)
 	}
@@ -773,7 +926,6 @@ func callStateDb(ef *EnvFunctions, proc *exec.WavmProcess, valAddr uint64, state
 
 func getArrayLength(ef *EnvFunctions, lengthKeyHash common.Hash) uint64 {
 	length := ef.ctx.StateDB.GetState(ef.ctx.Contract.Address(), lengthKeyHash).Bytes()
-	log.Debug("env_funcs", "func", "getArrayLength", "hash", lengthKeyHash.String(), "len", length)
 	return endianess.Uint64(length[len(length)-8:])
 }
 
@@ -784,62 +936,50 @@ func inBounds(memoryData []byte, end uint64) {
 }
 
 func getMemory(proc *exec.WavmProcess, addr uint64, addrType int32, isArrayIndex bool, length uint64) []byte {
-	log.Debug("func", "getMemory", "")
 	var mem []byte
 	memoryData := proc.GetData()
 	switch addrType {
 	case abi.TY_INT32:
 		inBounds(memoryData, addr+4)
 		mem = memoryData[addr : addr+4]
-		log.Debug("getMemory", "int32", int32(endianess.Uint32(mem)))
 	case abi.TY_INT64:
 		inBounds(memoryData, addr+8)
 		mem = memoryData[addr : addr+8]
-		log.Debug("getMemory", "int64", int64(endianess.Uint64(mem)))
 	case abi.TY_UINT32:
 		inBounds(memoryData, addr+4)
 		mem = memoryData[addr : addr+4]
-		log.Debug("getMemory", "uint32", endianess.Uint32(mem))
 	case abi.TY_UINT64:
 		inBounds(memoryData, addr+8)
 		mem = memoryData[addr : addr+8]
 		if isArrayIndex {
 			index := endianess.Uint64(mem)
-			log.Debug("getMemory", "array index", index, "length", length)
 			if index+1 > length {
 				panic(errExceededArray)
 			}
 		}
-		log.Debug("getMemory", "uint64", endianess.Uint64(mem))
 	case abi.TY_UINT256:
 		inBounds(memoryData, addr+4)
 		ptr := endianess.Uint32(memoryData[addr : addr+4])
 		mem = []byte(readU256FromMemory(proc, uint64(ptr)).String())
 		// mem = readU256FromMemory(proc, uint64(ptr)).Bytes()
-		log.Debug("getMemory", "uint256", string(mem))
 	case abi.TY_STRING:
 		inBounds(memoryData, addr+4)
 		ptr := endianess.Uint32(memoryData[addr : addr+4])
 		mem = proc.ReadAt(uint64(ptr))
-		log.Debug("getMemory", "string", string(mem))
 	case abi.TY_ADDRESS:
 		inBounds(memoryData, addr+4)
 		ptr := endianess.Uint32(memoryData[addr : addr+4])
 		mem = proc.ReadAt(uint64(ptr))
-		log.Debug("getMemory", "address", common.BytesToAddress(mem).Hex())
 	case abi.TY_BOOL:
 		inBounds(memoryData, addr+4)
 		mem = memoryData[addr : addr+4]
-		log.Debug("getMemory", "bool", endianess.Uint32(mem))
 	case abi.TY_POINTER:
 		mem = make([]byte, 8)
 		binary.BigEndian.PutUint64(mem, addr)
-		log.Debug("getMemory", "pointer", mem)
 	}
 	return mem
 }
 func (ef *EnvFunctions) WriteWithPointer(proc *exec.WavmProcess, offsetAddr, baseAddr uint64) {
-	log.Debug("instruction", "func", ">>>>>>>WriteWithPointer<<<<<<<")
 	valAddr := offsetAddr + baseAddr
 	storageMap := ef.ctx.StorageMapping
 	if _, ok := storageMap[valAddr]; ok {
@@ -851,28 +991,34 @@ func (ef *EnvFunctions) WriteWithPointer(proc *exec.WavmProcess, offsetAddr, bas
 		statedb := ef.ctx.StateDB
 		contractAddr := ef.ctx.Contract.Address()
 		if val.StorageValue.ValueType == abi.TY_STRING {
+			beforeN := statedb.GetState(contractAddr, keyHash).Big().Int64()
 			n, s := utils.Split(valMem)
-			statedb.SetState(contractAddr, keyHash, common.BigToHash(new(big.Int).SetInt64(int64(n))))
 			ef.ctx.GasCounter.GasStore(statedb, contractAddr, keyHash, common.BigToHash(new(big.Int).SetInt64(int64(n))))
+			statedb.SetState(contractAddr, keyHash, common.BigToHash(new(big.Int).SetInt64(int64(n))))
 			for i := 1; i <= n; i++ {
 				loc0 := new(big.Int).Add(keyHash.Big(), new(big.Int).SetInt64(int64(i)))
-				statedb.SetState(contractAddr, common.BigToHash(loc0), common.BytesToHash(s[i-1]))
 				ef.ctx.GasCounter.GasStore(statedb, contractAddr, common.BigToHash(loc0), common.BytesToHash(s[i-1]))
+				statedb.SetState(contractAddr, common.BigToHash(loc0), common.BytesToHash(s[i-1]))
+			}
+			for i := n + 1; i <= int(beforeN); i++ {
+				loc0 := new(big.Int).Add(keyHash.Big(), new(big.Int).SetInt64(int64(i)))
+				empty := common.Hash{}
+				ef.ctx.GasCounter.GasStore(statedb, contractAddr, common.BigToHash(loc0), empty)
+				statedb.SetState(contractAddr, common.BigToHash(loc0), empty)
 			}
 		} else if val.StorageValue.ValueType == abi.TY_UINT256 {
 			bigint := utils.GetU256(valMem)
+			ef.ctx.GasCounter.GasStore(statedb, contractAddr, keyHash, common.BytesToHash(valMem))
 			statedb.SetState(contractAddr, keyHash, common.BigToHash(bigint))
-			ef.ctx.GasCounter.GasStore(statedb, contractAddr, keyHash, common.BytesToHash(valMem))
 		} else {
-			statedb.SetState(contractAddr, keyHash, common.BytesToHash(valMem))
 			ef.ctx.GasCounter.GasStore(statedb, contractAddr, keyHash, common.BytesToHash(valMem))
+			statedb.SetState(contractAddr, keyHash, common.BytesToHash(valMem))
 		}
 	}
 	callStateDb(ef, proc, valAddr, op)
 }
 
 func (ef *EnvFunctions) ReadWithPointer(proc *exec.WavmProcess, offsetAddr, baseAddr uint64) {
-	log.Debug("instruction", "func", ">>>>>>ReadWithPointer<<<<<<<<<")
 	valAddr := offsetAddr + baseAddr
 	op := func(val storage.StorageMapping, keyHash common.Hash) {
 		stateVal := []byte{}
@@ -920,7 +1066,6 @@ func (ef *EnvFunctions) ReadWithPointer(proc *exec.WavmProcess, offsetAddr, base
 
 func (ef *EnvFunctions) InitializeVariables(proc *exec.WavmProcess) {
 	// 普通类型初始化，忽略mapping和array
-	log.Debug("EnvFunctions", "call", "InitializeVariables")
 	//need to ignore array type because array init need array length
 	storageMap := ef.ctx.StorageMapping
 	for k, v := range storageMap {
@@ -1022,6 +1167,55 @@ func (ef *EnvFunctions) U256Cmp(proc *exec.WavmProcess, x, y uint64) uint64 {
 	return uint64(res)
 }
 
+func (ef *EnvFunctions) U256Shl(proc *exec.WavmProcess, value, shift uint64) uint64 {
+	bigShift := readU256FromMemory(proc, shift)
+	bigValue := readU256FromMemory(proc, value)
+	ef.ctx.GasCounter.GasFastestStep()
+	if bigShift.Cmp(common.Big256) >= 0 {
+		res := new(big.Int).SetUint64(0)
+		return ef.returnU256(proc, res)
+	}
+	n := uint(bigShift.Uint64())
+	res := math.U256(bigValue.Lsh(bigValue, n))
+	return ef.returnU256(proc, res)
+}
+
+func (ef *EnvFunctions) U256Shr(proc *exec.WavmProcess, value, shift uint64) uint64 {
+	bigShift := readU256FromMemory(proc, shift)
+	bigValue := readU256FromMemory(proc, value)
+	if bigShift.Cmp(common.Big256) >= 0 {
+		res := new(big.Int).SetUint64(0)
+		return ef.returnU256(proc, res)
+	}
+	n := uint(bigShift.Uint64())
+	res := math.U256(bigValue.Rsh(bigValue, n))
+	return ef.returnU256(proc, res)
+}
+
+func (ef *EnvFunctions) U256And(proc *exec.WavmProcess, x, y uint64) uint64 {
+	bigx := readU256FromMemory(proc, x)
+	bigy := readU256FromMemory(proc, y)
+	res := bigx.And(bigx, bigy)
+	ef.ctx.GasCounter.GasFastestStep()
+	return ef.returnU256(proc, res)
+}
+
+func (ef *EnvFunctions) U256Or(proc *exec.WavmProcess, x, y uint64) uint64 {
+	bigx := readU256FromMemory(proc, x)
+	bigy := readU256FromMemory(proc, y)
+	res := bigx.Or(bigx, bigy)
+	ef.ctx.GasCounter.GasFastestStep()
+	return ef.returnU256(proc, res)
+}
+
+func (ef *EnvFunctions) U256Xor(proc *exec.WavmProcess, x, y uint64) uint64 {
+	bigx := readU256FromMemory(proc, x)
+	bigy := readU256FromMemory(proc, y)
+	res := bigx.Xor(bigx, bigy)
+	ef.ctx.GasCounter.GasFastestStep()
+	return ef.returnU256(proc, res)
+}
+
 func (ef *EnvFunctions) Pow(proc *exec.WavmProcess, base, exponent uint64) uint64 {
 	b := new(big.Int)
 	b.SetUint64(base)
@@ -1070,16 +1264,17 @@ func (ef *EnvFunctions) returnHash(proc *exec.WavmProcess, hash []byte) uint64 {
 	return uint64(proc.SetBytes(hash))
 }
 
+//Sender for qlang
 func (ef *EnvFunctions) Sender(proc *exec.WavmProcess, ptr uint64) {
-	sender := ef.ctx.Contract.Address().Bytes()
-	log.Debug("EnvFunctions", "func", "Sender", "ptr", ptr, "data", sender)
+	ctx := ef.ctx
+	ctx.GasCounter.GasGetSender()
+	sender := ctx.Contract.CallerAddress.Bytes()
 	proc.WriteAt(sender, int64(ptr))
 }
 
+//Load for qlang
 func (ef *EnvFunctions) Load(proc *exec.WavmProcess, keyptr uint64, dataptr uint64) uint64 {
-	log.Debug("EnvFunctions", "func", "Load")
 	keyData := ef.getQString(proc, keyptr)
-	log.Debug("EnvFunctions", "func", "Load", "key data", keyData, "data ptr", dataptr)
 	keyHash := common.BytesToHash(keyData)
 	statedb := ef.ctx.StateDB
 	contractAddr := ef.ctx.Contract.Address()
@@ -1089,25 +1284,33 @@ func (ef *EnvFunctions) Load(proc *exec.WavmProcess, keyptr uint64, dataptr uint
 		loc0 := new(big.Int).Add(keyHash.Big(), new(big.Int).SetInt64(int64(i)))
 		val0 := statedb.GetState(contractAddr, common.BigToHash(loc0)).Big().Bytes()
 		stateVal = append(stateVal, val0...)
+		ef.ctx.GasCounter.GasLoad()
 	}
-	log.Debug("EnvFunctions", "func", "Load", "value data", stateVal, "size", len(stateVal))
 	proc.WriteAt(stateVal, int64(dataptr))
 	return uint64(len(stateVal))
 }
 
+//Store for qlang
 func (ef *EnvFunctions) Store(proc *exec.WavmProcess, keyptr uint64, dataptr uint64) {
-	log.Debug("EnvFunctions", "func", "Store")
 	keyData := ef.getQString(proc, keyptr)
 	keyHash := common.BytesToHash(keyData)
 	valueData := ef.getQString(proc, dataptr)
-	log.Debug("EnvFunctions", "func", "Store", "key ptr", keyptr, "key data", keyData, "value ptr", dataptr, "value data", valueData)
 	statedb := ef.ctx.StateDB
 	contractAddr := ef.ctx.Contract.Address()
+	beforeN := statedb.GetState(contractAddr, keyHash).Big().Int64()
 	n, s := utils.Split(valueData)
+	ef.ctx.GasCounter.GasStore(statedb, contractAddr, keyHash, common.BigToHash(new(big.Int).SetInt64(int64(n))))
 	statedb.SetState(contractAddr, keyHash, common.BigToHash(new(big.Int).SetInt64(int64(n))))
 	for i := 1; i <= n; i++ {
 		loc0 := new(big.Int).Add(keyHash.Big(), new(big.Int).SetInt64(int64(i)))
+		ef.ctx.GasCounter.GasStore(statedb, contractAddr, common.BigToHash(loc0), common.BytesToHash(s[i-1]))
 		statedb.SetState(contractAddr, common.BigToHash(loc0), common.BytesToHash(s[i-1]))
+	}
+	for i := n + 1; i <= int(beforeN); i++ {
+		loc0 := new(big.Int).Add(keyHash.Big(), new(big.Int).SetInt64(int64(i)))
+		empty := common.Hash{}
+		ef.ctx.GasCounter.GasStore(statedb, contractAddr, common.BigToHash(loc0), empty)
+		statedb.SetState(contractAddr, common.BigToHash(loc0), empty)
 	}
 }
 
@@ -1115,13 +1318,11 @@ func (ef *EnvFunctions) getQString(proc *exec.WavmProcess, strPtr uint64) []byte
 	size := endianess.Uint32(proc.GetData()[strPtr : strPtr+4])
 	offset := endianess.Uint32(proc.GetData()[strPtr+4 : strPtr+8])
 	strData := proc.GetData()[offset : offset+size]
-	log.Debug("EnvFunctions", "func", "getQString", "str_ptr", strPtr, "size", size, "offset", offset, "string data", strData)
 	return strData
 }
 
 func (ef *EnvFunctions) forbiddenMutable(proc *exec.WavmProcess) {
 	if proc.Mutable() == false {
-		log.Debug("ForbiddenMutable", "msg", "this function is not a mutable function")
 		err := errors.New("Mutable Forbidden: This function is not a mutable function")
 		panic(err)
 	}
