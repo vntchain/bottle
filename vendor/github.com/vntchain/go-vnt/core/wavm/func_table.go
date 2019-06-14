@@ -218,7 +218,7 @@ func (ef *EnvFunctions) getFuncTable() map[string]wasm.Function {
 		OpNameEcrecover: {
 			Host: reflect.ValueOf(ef.Ecrecover),
 			Sig: &wasm.FunctionSig{
-				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32},
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32},
 				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI32},
 			},
 			Body: &wasm.FunctionBody{
