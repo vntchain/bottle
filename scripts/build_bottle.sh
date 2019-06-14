@@ -6,9 +6,9 @@
           exit 1;
      fi 
 
-     # if ! CGO_LDFLAGS="-L$ROOT/build/lib/clang/clang/lib -Wl,-rpath,$ROOT/build/lib/clang/clang/lib -lclang" go test ./... -v -count=1
-     # then 
-     #      printf "\\tRun test Error.\\n"
-     #      printf "\\tExiting now.\\n\\n"
-     #      exit 1;
-     # fi 
+     if ! CGO_LDFLAGS="-L$ROOT/build/lib/clang/clang/lib -Wl,-rpath,$ROOT/build/lib/clang/clang/lib -lclang" go test ./... -v -count=1
+     then 
+          printf "\\tRun test Error.\\n"
+          printf "\\tExiting now.\\n\\n"
+          exit 1;
+     fi 
