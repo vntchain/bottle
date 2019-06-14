@@ -187,7 +187,11 @@ func createStructList(cursor, parent clang.Cursor) {
 				// fmt.Printf("node.FieldType %s\n", node.FieldType)
 				// fmt.Printf("struct element %v\n", strings.Split(node.FieldType, "@@@"))
 				if pcursorname == "" {
-					structLists.Root[pcursortype].Add(cursorname, node.FieldType, "", node.FieldType)
+					// structLists.Root[pcursortype].Add(cursorname, node.FieldType, "", node.FieldType)
+					childnode := structStack[len(structStack)-1]
+					structStack = structStack[0 : len(structStack)-1]
+					node := structStack[len(structStack)-1]
+					node.Add(cursorname, childnode.FieldType, "", node.FieldType)
 				} else if strings.Contains(cursortype, "anonymous struct") {
 					childnode := structStack[len(structStack)-1]
 					node = structLists.Root[pcursorname]

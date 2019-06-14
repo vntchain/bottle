@@ -118,7 +118,6 @@ func (nd *Node) Get(name string) (*Node, error) {
 }
 
 func (nd *Node) Traversal(r Root) {
-	// fmt.Printf("Node %v\n", nd)
 	for _, v := range nd.Children {
 		if child, ok := r.Root[v.FieldType]; ok {
 
