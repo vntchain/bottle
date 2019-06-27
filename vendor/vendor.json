@@ -770,15 +770,14 @@
 			"checksumSHA1": "I4njd26dG5hxFT2nawuByM4pxzY=",
 			"origin": "github.com/vntchain/go-vnt/vendor/github.com/mattn/go-colorable",
 			"path": "github.com/mattn/go-colorable",
-			"revision": "a8e4325a47707a2edb084b35299e7b41c4091ebe",
-			"revisionTime": "2019-02-15T03:41:53Z"
+			"revision": "612cacd150e28df989ba99015033855b7a42b7ea",
+			"revisionTime": "2019-06-21T05:25:19Z"
 		},
 		{
-			"checksumSHA1": "EkT5JmFvz3zOPWappEFyYWUaeY0=",
-			"origin": "github.com/vntchain/go-vnt/vendor/github.com/mattn/go-isatty",
+			"checksumSHA1": "74gCzvJiE6bXX3i4vIVCYhffDHc=",
 			"path": "github.com/mattn/go-isatty",
-			"revision": "a8e4325a47707a2edb084b35299e7b41c4091ebe",
-			"revisionTime": "2019-02-15T03:41:53Z"
+			"revision": "1311e847b0cb909da63b5fecfb5370aa66236465",
+			"revisionTime": "2019-05-22T01:25:13Z"
 		},
 		{
 			"checksumSHA1": "mJQtsTCZGhCmjdFtXBWryZSri/o=",
