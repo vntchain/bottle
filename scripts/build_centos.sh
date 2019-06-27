@@ -1,7 +1,7 @@
      WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
      LLVM_URL="http://releases.llvm.org/5.0.0/llvm-5.0.0.src.tar.xz"
      CLANG_URL="http://releases.llvm.org/5.0.0/cfe-5.0.0.src.tar.xz" 
-     NODE_URL="https://nodejs.org/download/release/latest-v10.x/node-v10.15.3-linux-x64.tar.xz"
+     NODE_URL="https://nodejs.org/download/release/v10.16.0/node-v10.16.0-linux-x64.tar.xz"
      CPU_CORE=$( lscpu -pCPU | grep -v "#" | wc -l )
      printf "\\tChecking cmake installation\\n"
 	if ! CMAKE=$( command -v cmake)
