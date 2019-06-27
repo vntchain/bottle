@@ -42,10 +42,10 @@ git clone https://github.com/vntchain/bottle
 
 编译``bottle``需要[go](https://golang.org/)编译器，``go``的安装请参考``go``的官方文档
 
-同时需要安装依赖包libxml2-dev
+同时需要安装依赖包libxml2-dev,xz-utils,gcc
 
 ```
-sudo apt-get install -y libxml2-dev
+sudo apt-get install -y libxml2-dev xz-utils gcc
 ```
 
 然后使用以下命令编译得到``bottle``

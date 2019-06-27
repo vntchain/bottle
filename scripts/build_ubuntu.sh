@@ -1,9 +1,9 @@
-     WASMCEPTION_URL="http://192.168.9.251:9000/temp/wasmception-linux-bin.tar.gz"
+     WASMCEPTION_URL="https://github.com/ooozws/clang-heroku-slug/raw/master/precomp/wasmception-linux-bin.tar.gz"
      OS_VERSION=$( cat /etc/os-release | grep ^VERSION_ID | cut -d'=' -f2 | sed 's/\"//gI' )
      NODE_URL="https://nodejs.org/download/release/v10.16.0/node-v10.16.0-linux-x64.tar.xz"
      case "$OS_VERSION" in
           "16.04")
-          CLANG_URL="http://192.168.9.251:9000/temp/clang+llvm-5.0.0-linux-x86_64-ubuntu16.04.tar.xz"
+          CLANG_URL="http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-linux-x86_64-ubuntu16.04.tar.xz"
           ;;
           "14.04")
           CLANG_URL="http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-linux-x86_64-ubuntu14.04.tar.xz"
