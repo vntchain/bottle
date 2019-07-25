@@ -11,6 +11,8 @@ fi
 # Set up the environment to use the workspace.
 # GOPATH="$PWD"
 # export GOPATH
+GOPATH=$(echo ${GOPATH})
+export GOPATH
 GOBIN="$PWD/build/bin"
 export GOBIN
 
