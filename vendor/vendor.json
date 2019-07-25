@@ -108,48 +108,6 @@
 			"tree": true
 		},
 		{
-			"checksumSHA1": "7K2qF16AvubozMBzZEzlBW0lNNY=",
-			"path": "github.com/go-interpreter/wagon/disasm",
-			"revision": "04ad9bf96320ee71f7444e2eb2c0959bf40d8bab",
-			"revisionTime": "2018-12-19T03:09:21Z"
-		},
-		{
-			"checksumSHA1": "4yRxeKi6k5yIf87EwOXzbSTlTRU=",
-			"path": "github.com/go-interpreter/wagon/exec/internal/compile",
-			"revision": "04ad9bf96320ee71f7444e2eb2c0959bf40d8bab",
-			"revisionTime": "2018-12-19T03:09:21Z"
-		},
-		{
-			"checksumSHA1": "6zjjuEauIj/855KLJGKT2cgjVio=",
-			"path": "github.com/go-interpreter/wagon/internal/stack",
-			"revision": "04ad9bf96320ee71f7444e2eb2c0959bf40d8bab",
-			"revisionTime": "2018-12-19T03:09:21Z"
-		},
-		{
-			"checksumSHA1": "NUIMs+zfyuHDzStjUq0qCr0uKcs=",
-			"path": "github.com/go-interpreter/wagon/wasm",
-			"revision": "04ad9bf96320ee71f7444e2eb2c0959bf40d8bab",
-			"revisionTime": "2018-12-19T03:09:21Z"
-		},
-		{
-			"checksumSHA1": "kRHgYIzF9xTBn1Ai9h5H0wcPfp8=",
-			"path": "github.com/go-interpreter/wagon/wasm/internal/readpos",
-			"revision": "04ad9bf96320ee71f7444e2eb2c0959bf40d8bab",
-			"revisionTime": "2018-12-19T03:09:21Z"
-		},
-		{
-			"checksumSHA1": "PwuCAZewDWGOeIK2Ya8vh2ux3ik=",
-			"path": "github.com/go-interpreter/wagon/wasm/leb128",
-			"revision": "04ad9bf96320ee71f7444e2eb2c0959bf40d8bab",
-			"revisionTime": "2018-12-19T03:09:21Z"
-		},
-		{
-			"checksumSHA1": "Ic6GhILuFEnGnMq8pOM2iUrJq54=",
-			"path": "github.com/go-interpreter/wagon/wasm/operators",
-			"revision": "04ad9bf96320ee71f7444e2eb2c0959bf40d8bab",
-			"revisionTime": "2018-12-19T03:09:21Z"
-		},
-		{
 			"checksumSHA1": "KZ3QD2QgUS4RcoKiA3mn5pSlJxQ=",
 			"origin": "github.com/vntchain/go-vnt/vendor/github.com/go-stack/stack",
 			"path": "github.com/go-stack/stack",
