@@ -402,7 +402,7 @@ func getFunctionInfo(cursor, parent clang.Cursor) FunctionInfo {
 		if len(cont) == 0 {
 			export = ExportTypeNone
 		} else {
-			cont = strings.Split(cont[0], "\n")
+			cont = strings.Split(strings.Replace(cont[0], "\r\n", "\n", -1), "\n")
 			if cont[0] == KWMutable {
 				export = ExportTypeMutable
 			} else if cont[0] == KWUnmutable {
