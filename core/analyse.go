@@ -127,7 +127,7 @@ func (h *Hint) contructorCheck() (HintMessages, error) {
 		return msgs, nil
 	}
 
-	constructorReg := `(constructor)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
+	constructorReg := `(constructor)[^(;|\r\n|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		call := fmt.Sprintf(constructorReg, escape(v.Name))
 		reg := regexp.MustCompile(call)
@@ -230,7 +230,7 @@ func Traversal(node *abi.Node) []string {
 
 func (h *Hint) callCheck() (HintMessages, error) {
 	var msgs HintMessages
-	callReg := `(CALL)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
+	callReg := `(CALL)[^(;|\r\n|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		call := fmt.Sprintf(callReg, escape(v.Name))
 		reg := regexp.MustCompile(call)
@@ -301,7 +301,7 @@ func (h *Hint) callCheck() (HintMessages, error) {
 //EVENT event_name(indexed[option] param_type param_name)
 func (h *Hint) eventCheck() (HintMessages, error) {
 	var msgs HintMessages
-	eventReg := `(EVENT)[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
+	eventReg := `(EVENT)[^(;|\r\n|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		event := fmt.Sprintf(eventReg, escape(v.Name))
 		reg := regexp.MustCompile(event)
@@ -402,7 +402,7 @@ func (h *Hint) payableCheck() (HintMessages, error) {
 
 func (h *Hint) exportCheck() (HintMessages, error) {
 	var msgs HintMessages
-	exportReg := `[^(;|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
+	exportReg := `[^(;|\r\n|\r|\n|\{|\})]*(\s+)(%s)(\s*)(\({1})([a-zA-Z0-9_\*\s,]*)(\){1})`
 	for _, v := range functionTree.Root {
 		if v.Info.Export == ExportTypeNone {
 			//ignore

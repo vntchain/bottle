@@ -284,7 +284,7 @@ func (gen *abiGen) parseMethod() {
 	reg := regexp.MustCompile(methodReg)
 	res := reg.FindAllString(string(gen.Code), -1)
 	for _, v := range res {
-		s1 := strings.Split(v, "\n")
+		s1 := strings.Split(strings.Replace(v, "\r\n", "\n", -1), "\n")
 		if len(s1) < 2 {
 			panic("Irregular method structure")
 		}
@@ -568,7 +568,7 @@ func isConstant(input string) bool {
 	inputs := strings.Split(input, " ")
 	if inputs[0] == mutable {
 		return false
-	} else if input == unmutable {
+	} else if inputs[0] == unmutable {
 		return true
 	} else {
 		panic("Unsupport keyword " + inputs[0])

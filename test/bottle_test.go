@@ -155,7 +155,7 @@ func TestBottle(t *testing.T) {
 	}
 	for _, v := range tests {
 		res := execBottle(path.Join(contractsPath, v.contract))
-		errStrs := strings.Split(res, "\n")
+		errStrs := strings.Split(strings.Replace(res, "\r\n", "\n", -1), "\n")
 		errs := []string{}
 		for _, err := range errStrs {
 			spl := strings.Split(err, ": ")
