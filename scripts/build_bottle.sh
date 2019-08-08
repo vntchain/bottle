@@ -1,5 +1,4 @@
      cd $PWD
-     echo $PWD
      if ! CGO_LDFLAGS="-L$ROOT/build/lib/clang/clang/lib -Wl,-rpath,$ROOT/build/lib/clang/clang/lib -lclang" go install -ldflags " -X main.vntIncludeFlag=$ROOT/build/lib/clang/clang/lib/clang/5.0.0/include  -X main.wasmCeptionFlag=$ROOT/build/lib/wasmception/wasmception -X main.nodeFlag=$ROOT/build/lib/node/node -X main.gitCommit=$COMMITID  -v" ../bottle
      then 
           printf "\\tError compiling bottle.\\n"

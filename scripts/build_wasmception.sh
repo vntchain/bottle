@@ -1,4 +1,4 @@
-     printf "\\tInstall wasmception.\\n"
+    printf "\\tInstall wasmception.\\n"
 	if [ ! -d $ROOT/build/lib/wasmception/wasmception ]
 	then
 		mkdir -p $ROOT/build/lib/wasmception

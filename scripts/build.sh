@@ -2,6 +2,7 @@
 set -e
 TIME_BEGIN=$( date -u +%s )
 PWD="$(pwd)"
+echo "aaa" $PWD
 ROOT="$PWD"
 MARCH=$(go env GOOS)
 GOVERSION=$(go version)
