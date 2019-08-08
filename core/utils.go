@@ -192,6 +192,7 @@ func unpackZip(dst string, src string, depth int) error {
 
 func isEmpty(dir string) bool {
 	files, _ := ioutil.ReadDir(dir)
+	fmt.Printf("files %+v\n", files)
 	if len(files) == 0 {
 		return true
 	} else {
