@@ -27,6 +27,7 @@ export GOBIN
 
 cd "$bottledir/bottle"
 PWD="$bottledir/bottle"
+export PWD
 # Launch the arguments with the configured environment.
 exec "$@"
 
