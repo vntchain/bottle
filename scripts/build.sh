@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 TIME_BEGIN=$( date -u +%s )
-ROOT="$PWD"
+ROOT="$bottlePath"
 MARCH=$(go env GOOS)
 GOVERSION=$(go version)
 clang_dir="clang"
