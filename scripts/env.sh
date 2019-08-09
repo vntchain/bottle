@@ -26,8 +26,7 @@ GOBIN="$PWD/build/bin"
 export GOBIN
 
 cd "$bottledir/bottle"
-PWD="$bottledir/bottle"
+bottlePath="$bottledir/bottle"
+export bottlePath
 # Launch the arguments with the configured environment.
 exec "$@"
-
-
