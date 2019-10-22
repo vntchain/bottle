@@ -156,6 +156,10 @@ func createStructList(cursor, parent clang.Cursor) {
 			fieldname := cursor.TypedefDeclUnderlyingType().Spelling()[7:]
 			if fieldname == cursorname { //匿名结构体
 				// fmt.Printf("匿名结构体\n")
+				// TypedefDecl && TranslationUnit && 匿名结构体 说明一个typedef struct遍历结束，去掉该struct的stack
+				if len(structStack) != 0 {
+					structStack = structStack[0 : len(structStack)-1]
+				}
 			} else {
 				node := abi.NewNode(cursorname, fieldname, "")
 				structLists.Root[cursorname] = node
@@ -199,6 +203,14 @@ func createStructList(cursor, parent clang.Cursor) {
 						//   string a;
 						//   mapping(string, string) b;
 						// } s3;
+
+						//typedef struct
+						//{
+						//	array(address) fans;
+						//} FansList
+						// 例如上面这个结构体定义，最后遍历结束fans不是匿名的
+						// FieldDecl && StructDecl 说明遍历到了结果体内部最后的元素，要去掉该结构体的stack
+						structStack = structStack[0 : len(structStack)-1]
 						structLists.Root[pcursortype].Add(cursorname, node.FieldType, "", node.FieldType)
 					}
 				} else if strings.Contains(cursortype, "anonymous struct") {
